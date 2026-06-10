@@ -7,8 +7,8 @@
 <link rel="icon" href="data:,">
 <style>
   :root { --bg:#f5f4f1; --header:#d9d9d9; --panel:#fff; --panel2:#f7f6f2;
-          --line:#d0e0d0; --txt:#1a1a1a; --muted:#6a8a6a;
-          --green:#3a8a3a; --green-d:#1c4a1c;
+          --line:#d8dadd; --txt:#1a1a1a; --muted:#6b7177;
+          --green:#5b626b; --green-d:#2b3036;
           --red:#c0392b; --blue:#2b6cb0; --amber:#b7791f; }
   * { box-sizing:border-box; }
   body { margin:0; background:var(--bg); color:var(--txt);
@@ -30,17 +30,17 @@
   .gate { text-align:center; padding:80px 20px; color:var(--muted); }
   .gate h2 { color:var(--green-d); }
   .topline { display:flex; align-items:center; gap:14px; margin-bottom:16px; color:var(--muted); font-size:12px; }
-  .topline button { background:#fff; border:1px solid var(--line); color:#33473a;
+  .topline button { background:#fff; border:1px solid var(--line); color:#444a50;
                     border-radius:6px; padding:5px 12px; cursor:pointer; font-size:12px; }
   .topline button:hover { background:var(--bg); }
   .card { background:var(--panel); border:1px solid var(--line); border-top:3px solid var(--green);
           border-radius:11px; padding:16px 18px; margin-bottom:18px;
           box-shadow:0 1px 3px rgba(0,0,0,.05); }
   .card h3 { margin:0 0 14px; font-size:.62rem; text-transform:uppercase;
-             letter-spacing:.12em; font-weight:700; color:#9aab9a; }
+             letter-spacing:.12em; font-weight:700; color:#9aa0a6; }
   .dot { display:inline-block; width:9px; height:9px; border-radius:50%; margin-right:7px; vertical-align:middle; }
   .green{background:var(--green)} .red{background:var(--red)} .blue{background:var(--blue)}
-  .amber{background:var(--amber)} .dim{background:#9aab9a}
+  .amber{background:var(--amber)} .dim{background:#9aa0a6}
   .kpis { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:12px; }
   .kpi { background:var(--panel2); border:1px solid var(--line); border-radius:8px; padding:12px 14px; }
   .kpi .lbl { font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:.4px; }
@@ -53,7 +53,7 @@
   tr.bad td { background:rgba(192,57,43,.07); }
   tr.dimrow td { opacity:.5; }
   .badge { display:inline-block; padding:2px 9px; border-radius:20px; font-size:11px; font-weight:600; }
-  .b-green{background:rgba(58,138,58,.14);color:var(--green-d)}
+  .b-green{background:rgba(90,98,107,.15);color:var(--green-d)}
   .b-red{background:rgba(192,57,43,.12);color:#a32020}
   .b-blue{background:rgba(43,108,176,.14);color:#1d4e80}
   .b-amber{background:rgba(183,121,31,.16);color:#8a5a12}

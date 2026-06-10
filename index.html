@@ -7,8 +7,8 @@
 <link rel="icon" href="data:,">
 <style>
   :root { --bg:#f5f4f1; --header:#d9d9d9; --panel:#fff; --panel2:#f1f0ec;
-          --line:#d0e0d0; --txt:#1a1a1a; --muted:#6a8a6a;
-          --green:#3a8a3a; --green-d:#1c4a1c; --gold:#3a8a3a;
+          --line:#d8dadd; --txt:#1a1a1a; --muted:#6b7177;
+          --green:#5b626b; --green-d:#2b3036; --gold:#5b626b;
           --red:#c0392b; --blue:#2b6cb0; --amber:#b7791f; }
   * { box-sizing:border-box; }
   body { margin:0; background:var(--bg); color:var(--txt);
@@ -34,7 +34,7 @@
           border-radius:11px; padding:16px 18px; margin-bottom:18px;
           box-shadow:0 1px 3px rgba(0,0,0,.05); }
   .card h3 { margin:0 0 12px; font-size:.62rem; text-transform:uppercase;
-             letter-spacing:.12em; font-weight:700; color:#9aab9a; }
+             letter-spacing:.12em; font-weight:700; color:#9aa0a6; }
   .addgrid { display:grid; grid-template-columns:1.6fr 1fr 1fr .9fr auto;
              gap:10px; align-items:end; }
   label.f { display:flex; flex-direction:column; gap:4px; font-size:11px; color:var(--muted); }
@@ -45,7 +45,7 @@
                padding:9px 16px; font-weight:600; cursor:pointer; font-size:13px; }
   button.btn:hover { background:var(--green-d); }
   button.btn:disabled { opacity:.5; cursor:default; }
-  button.ghost { background:#fff; border:1px solid var(--line); color:#33473a;
+  button.ghost { background:#fff; border:1px solid var(--line); color:#444a50;
                  border-radius:6px; padding:6px 10px; cursor:pointer; font-size:12px; }
   button.ghost:hover { background:var(--bg); }
   button.danger { border-color:var(--red); color:var(--red); }
@@ -61,11 +61,11 @@
   td.sub { color:var(--muted); font-size:11px; }
   .pill { display:inline-block; padding:2px 9px; border-radius:20px; font-size:11px;
           font-weight:600; }
-  .pill.editor { background:rgba(58,138,58,.14); color:var(--green-d); }
+  .pill.editor { background:rgba(90,98,107,.15); color:var(--green-d); }
   .pill.read   { background:rgba(106,138,106,.14); color:var(--muted); }
   .rowbtns { display:flex; gap:6px; justify-content:flex-end; }
   #msg { margin:0 0 14px; padding:10px 14px; border-radius:8px; font-size:13px; display:none; }
-  #msg.ok  { display:block; background:rgba(58,138,58,.12); color:var(--green-d); }
+  #msg.ok  { display:block; background:rgba(90,98,107,.13); color:var(--green-d); }
   #msg.err { display:block; background:rgba(192,57,43,.10); color:#a32020; }
   .dirty input, .dirty select { border-color:var(--gold); }
   @media (max-width:760px){
