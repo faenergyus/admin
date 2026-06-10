@@ -93,6 +93,16 @@
     </div>
 
     <div class="card">
+      <h3>SQL Agent jobs — SF\SQLDEV (<span id="job-count">0</span>)</h3>
+      <div class="filters"><span id="job-summary"></span></div>
+      <div id="job-notice" class="sub2" style="display:none"></div>
+      <div class="tablewrap"><table>
+        <thead><tr><th>Job</th><th>Enabled</th><th>Last run</th><th>Outcome</th><th>Next run</th></tr></thead>
+        <tbody id="job-rows"></tbody>
+      </table></div>
+    </div>
+
+    <div class="card">
       <h3>Scheduled tasks — svrxspoc (<span id="task-count">0</span>)</h3>
       <div class="filters">
         <span id="task-summary"></span>
@@ -164,6 +174,15 @@ function taskResult(code, state){
   return {t:'FAILED ('+code+')', c:'b-red', bad:true};
 }
 
+function jobOutcome(o, running, enabled){
+  if (running) return {t:'Running', c:'b-blue', bad:false};
+  if (!enabled) return {t:'Disabled', c:'b-dim', bad:false, dim:true};
+  if (o===1) return {t:'Succeeded', c:'b-green', bad:false};
+  if (o===0) return {t:'Failed', c:'b-red', bad:true};
+  if (o===3) return {t:'Canceled', c:'b-amber', bad:false};
+  return {t:'Never run', c:'b-dim', bad:false, dim:true};   // 5 / null
+}
+
 let LAST = null;
 function render(d){
   LAST = d;
@@ -192,6 +211,36 @@ function render(d){
       '<td'+(slow?' style="color:var(--amber)"':'')+'>'+(db.ms!=null?db.ms+' ms':'—')+'</td>'+
       '<td>'+m+'</td><td class="sub2">'+esc(db.error||'')+'</td></tr>';
   }).join('');
+
+  // SQL Agent jobs (SF\SQLDEV)
+  var aj = d.agent_jobs || {ok:false, jobs:[], error:'no data'};
+  var notice = document.getElementById('job-notice');
+  var jrows = document.getElementById('job-rows');
+  if (!aj.ok) {
+    document.getElementById('job-count').textContent = 0;
+    document.getElementById('job-summary').innerHTML = '';
+    notice.style.display = 'block';
+    notice.innerHTML = '⚠ Cannot read SQL Agent jobs yet — the API identity needs a one-time grant on '+
+      'SF\\SQLDEV (msdb SQLAgentReaderRole). <span style="opacity:.7">'+esc(aj.error||'')+'</span>';
+    jrows.innerHTML = '';
+  } else {
+    notice.style.display = 'none';
+    var jm = (aj.jobs||[]).map(function(x){ return Object.assign({}, x, {_o: jobOutcome(x.last_outcome, x.running, x.enabled)}); });
+    var jBad = jm.filter(function(x){return x._o.bad;}).length;
+    var jRun = jm.filter(function(x){return x.running;}).length;
+    var jDis = jm.filter(function(x){return !x.enabled;}).length;
+    document.getElementById('job-count').textContent = jm.length;
+    document.getElementById('job-summary').innerHTML =
+      dot('green')+(jm.length-jBad-jDis)+' ok &nbsp; '+dot('red')+jBad+' failed &nbsp; '+dot('blue')+jRun+' running &nbsp; '+dot('dim')+jDis+' disabled';
+    jm.sort(function(x,y){ return (y._o.bad?1:0)-(x._o.bad?1:0) || x.name.localeCompare(y.name); });
+    jrows.innerHTML = jm.map(function(x){
+      return '<tr'+(x._o.bad?' class="bad"':(x._o.dim?' class="dimrow"':''))+'>'+
+        '<td>'+esc(x.name)+'</td><td class="sub2">'+(x.enabled?'yes':'no')+'</td>'+
+        '<td class="sub2">'+esc(x.last_run||'—')+'</td>'+
+        '<td><span class="badge '+x._o.c+'">'+x._o.t+'</span></td>'+
+        '<td class="sub2">'+esc(x.next_run||'—')+'</td></tr>';
+    }).join('');
+  }
 
   // tasks
   var tasks = (d.tasks||[]).slice();
