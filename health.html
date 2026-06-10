@@ -6,59 +6,63 @@
 <title>FAE Admin — Platform Health</title>
 <link rel="icon" href="data:,">
 <style>
-  :root { --bg:#16191d; --panel:#1f242b; --panel2:#262d36; --line:#323b46;
-          --txt:#e7ebf0; --muted:#8b97a6; --gold:#e0a64a; --red:#d9544e;
-          --green:#3fae6b; --blue:#4a90d9; --amber:#e0a64a; }
+  :root { --bg:#f5f4f1; --header:#d9d9d9; --panel:#fff; --panel2:#f7f6f2;
+          --line:#d0e0d0; --txt:#1a1a1a; --muted:#6a8a6a;
+          --green:#3a8a3a; --green-d:#1c4a1c;
+          --red:#c0392b; --blue:#2b6cb0; --amber:#b7791f; }
   * { box-sizing:border-box; }
   body { margin:0; background:var(--bg); color:var(--txt);
-         font-family:"Segoe UI",Roboto,Helvetica,Arial,sans-serif; overflow-x:hidden; }
-  header { display:flex; align-items:center; gap:14px; padding:14px 20px;
-           background:var(--panel); border-bottom:1px solid var(--line); }
-  header img { height:34px; }
-  header h1 { font-size:18px; margin:0; font-weight:600; }
-  nav { display:flex; gap:4px; margin-left:18px; }
-  nav a { color:var(--muted); text-decoration:none; font-size:13px; padding:6px 12px;
-          border-radius:6px; }
-  nav a.active { color:var(--txt); background:var(--panel2); }
+         font-family:-apple-system,"Segoe UI",Roboto,sans-serif; overflow-x:hidden; }
+  header { display:flex; align-items:center; gap:12px; height:54px; padding:0 16px;
+           background:var(--header); box-shadow:0 2px 8px rgba(0,0,0,.18); }
+  header img { height:38px; }
+  header h1 { font-size:1rem; margin:0; font-weight:800; color:var(--green-d); }
+  nav { display:flex; gap:16px; margin-left:18px; }
+  nav a { color:#1a1a1a; text-decoration:none; font-size:.82rem; font-weight:600; }
+  nav a:hover { color:#c0392b; }
+  nav a.active { font-weight:800; color:#1a1a1a; cursor:default; }
   header .spacer { flex:1; }
-  #badge { font-size:13px; color:var(--muted); display:flex; align-items:center; gap:10px; }
-  #badge button { background:none; border:1px solid var(--line); color:var(--muted);
-                  border-radius:6px; padding:4px 10px; cursor:pointer; font-size:12px; }
-  main { padding:20px; max-width:1100px; margin:0 auto; }
+  #badge { font-size:.78rem; color:#1f1f1f; display:flex; align-items:center; gap:8px;
+           padding-left:16px; border-left:1px solid #bcbcbc; }
+  #badge button { background:none; border:0; color:#3a3a3a; text-decoration:underline;
+                  cursor:pointer; font-size:.7rem; padding:0; }
+  main { padding:24px 22px; max-width:1100px; margin:0 auto; }
   .gate { text-align:center; padding:80px 20px; color:var(--muted); }
-  .gate h2 { color:var(--txt); }
+  .gate h2 { color:var(--green-d); }
   .topline { display:flex; align-items:center; gap:14px; margin-bottom:16px; color:var(--muted); font-size:12px; }
-  .topline button { background:none; border:1px solid var(--line); color:var(--muted);
+  .topline button { background:#fff; border:1px solid var(--line); color:#33473a;
                     border-radius:6px; padding:5px 12px; cursor:pointer; font-size:12px; }
-  .card { background:var(--panel); border:1px solid var(--line); border-radius:10px;
-          padding:16px 18px; margin-bottom:18px; }
-  .card h3 { margin:0 0 14px; font-size:13px; text-transform:uppercase;
-             letter-spacing:.6px; color:var(--muted); }
+  .topline button:hover { background:var(--bg); }
+  .card { background:var(--panel); border:1px solid var(--line); border-top:3px solid var(--green);
+          border-radius:11px; padding:16px 18px; margin-bottom:18px;
+          box-shadow:0 1px 3px rgba(0,0,0,.05); }
+  .card h3 { margin:0 0 14px; font-size:.62rem; text-transform:uppercase;
+             letter-spacing:.12em; font-weight:700; color:#9aab9a; }
   .dot { display:inline-block; width:9px; height:9px; border-radius:50%; margin-right:7px; vertical-align:middle; }
   .green{background:var(--green)} .red{background:var(--red)} .blue{background:var(--blue)}
-  .amber{background:var(--amber)} .dim{background:#56606d}
+  .amber{background:var(--amber)} .dim{background:#9aab9a}
   .kpis { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:12px; }
   .kpi { background:var(--panel2); border:1px solid var(--line); border-radius:8px; padding:12px 14px; }
   .kpi .lbl { font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:.4px; }
-  .kpi .val { font-size:20px; font-weight:600; margin-top:5px; }
+  .kpi .val { font-size:20px; font-weight:700; margin-top:5px; }
   .kpi .sub { font-size:11px; color:var(--muted); margin-top:3px; }
   table { width:100%; border-collapse:collapse; font-size:13px; }
-  th { text-align:left; color:var(--muted); font-weight:600; font-size:11px; text-transform:uppercase;
-       letter-spacing:.5px; padding:8px 10px; border-bottom:1px solid var(--line); }
-  td { padding:7px 10px; border-bottom:1px solid var(--panel2); }
-  tr.bad td { background:rgba(217,84,78,.08); }
+  th { text-align:left; color:var(--muted); font-weight:700; font-size:11px; text-transform:uppercase;
+       letter-spacing:.5px; padding:8px 10px; border-bottom:2px solid var(--line); }
+  td { padding:7px 10px; border-bottom:1px solid #eee; }
+  tr.bad td { background:rgba(192,57,43,.07); }
   tr.dimrow td { opacity:.5; }
   .badge { display:inline-block; padding:2px 9px; border-radius:20px; font-size:11px; font-weight:600; }
-  .b-green{background:rgba(63,174,107,.18);color:var(--green)}
-  .b-red{background:rgba(217,84,78,.18);color:var(--red)}
-  .b-blue{background:rgba(74,144,217,.18);color:var(--blue)}
-  .b-amber{background:rgba(224,166,74,.18);color:var(--amber)}
-  .b-dim{background:rgba(139,151,166,.15);color:var(--muted)}
+  .b-green{background:rgba(58,138,58,.14);color:var(--green-d)}
+  .b-red{background:rgba(192,57,43,.12);color:#a32020}
+  .b-blue{background:rgba(43,108,176,.14);color:#1d4e80}
+  .b-amber{background:rgba(183,121,31,.16);color:#8a5a12}
+  .b-dim{background:rgba(106,138,106,.14);color:var(--muted)}
   .tablewrap { overflow-x:auto; }
   .sub2 { color:var(--muted); font-size:11px; }
   .filters { display:flex; gap:14px; margin-bottom:10px; font-size:12px; color:var(--muted); align-items:center; }
   .filters label { cursor:pointer; }
-  @media (max-width:760px){ nav{margin-left:0} header h1{font-size:15px} }
+  @media (max-width:760px){ nav{margin-left:0; gap:12px} }
 </style>
 </head>
 <body>

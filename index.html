@@ -6,63 +6,71 @@
 <title>FAE Admin — User Management</title>
 <link rel="icon" href="data:,">
 <style>
-  :root { --bg:#16191d; --panel:#1f242b; --panel2:#262d36; --line:#323b46;
-          --txt:#e7ebf0; --muted:#8b97a6; --gold:#e0a64a; --red:#d9544e;
-          --green:#3fae6b; --blue:#4a90d9; }
+  :root { --bg:#f5f4f1; --header:#d9d9d9; --panel:#fff; --panel2:#f1f0ec;
+          --line:#d0e0d0; --txt:#1a1a1a; --muted:#6a8a6a;
+          --green:#3a8a3a; --green-d:#1c4a1c; --gold:#3a8a3a;
+          --red:#c0392b; --blue:#2b6cb0; --amber:#b7791f; }
   * { box-sizing:border-box; }
   body { margin:0; background:var(--bg); color:var(--txt);
-         font-family:"Segoe UI",Roboto,Helvetica,Arial,sans-serif; overflow-x:hidden; }
-  header { display:flex; align-items:center; gap:14px; padding:14px 20px;
-           background:var(--panel); border-bottom:1px solid var(--line); }
-  header img { height:34px; }
-  header h1 { font-size:18px; margin:0; font-weight:600; letter-spacing:.3px; }
-  nav { display:flex; gap:4px; margin-left:18px; }
-  nav a { color:var(--muted); text-decoration:none; font-size:13px; padding:6px 12px; border-radius:6px; }
-  nav a.active { color:var(--txt); background:var(--panel2); }
+         font-family:-apple-system,"Segoe UI",Roboto,sans-serif; overflow-x:hidden; }
+  header { display:flex; align-items:center; gap:12px; height:54px; padding:0 16px;
+           background:var(--header); box-shadow:0 2px 8px rgba(0,0,0,.18); }
+  header img { height:38px; }
+  header h1 { font-size:1rem; margin:0; font-weight:800; color:var(--green-d); letter-spacing:.3px; }
+  nav { display:flex; gap:16px; margin-left:18px; }
+  nav a { color:#1a1a1a; text-decoration:none; font-size:.82rem; font-weight:600; }
+  nav a:hover { color:#c0392b; }
+  nav a.active { font-weight:800; color:#1a1a1a; cursor:default; }
   header .spacer { flex:1; }
-  #badge { font-size:13px; color:var(--muted); display:flex; align-items:center; gap:10px; }
-  #badge button { background:none; border:1px solid var(--line); color:var(--muted);
-                  border-radius:6px; padding:4px 10px; cursor:pointer; font-size:12px; }
-  main { padding:20px; max-width:1100px; margin:0 auto; }
+  #badge { font-size:.78rem; color:#1f1f1f; display:flex; align-items:center; gap:8px;
+           padding-left:16px; border-left:1px solid #bcbcbc; }
+  #badge button { background:none; border:0; color:#3a3a3a; text-decoration:underline;
+                  cursor:pointer; font-size:.7rem; padding:0; }
+  main { padding:24px 22px; max-width:1100px; margin:0 auto; }
   .gate { text-align:center; padding:80px 20px; color:var(--muted); }
-  .gate h2 { color:var(--txt); }
-  .gate a { color:var(--gold); }
-  .card { background:var(--panel); border:1px solid var(--line); border-radius:10px;
-          padding:16px 18px; margin-bottom:18px; }
-  .card h3 { margin:0 0 12px; font-size:14px; text-transform:uppercase;
-             letter-spacing:.6px; color:var(--muted); }
+  .gate h2 { color:var(--green-d); }
+  .gate a { color:var(--green); }
+  .card { background:var(--panel); border:1px solid var(--line); border-top:3px solid var(--green);
+          border-radius:11px; padding:16px 18px; margin-bottom:18px;
+          box-shadow:0 1px 3px rgba(0,0,0,.05); }
+  .card h3 { margin:0 0 12px; font-size:.62rem; text-transform:uppercase;
+             letter-spacing:.12em; font-weight:700; color:#9aab9a; }
   .addgrid { display:grid; grid-template-columns:1.6fr 1fr 1fr .9fr auto;
              gap:10px; align-items:end; }
   label.f { display:flex; flex-direction:column; gap:4px; font-size:11px; color:var(--muted); }
-  input, select { background:var(--panel2); border:1px solid var(--line); color:var(--txt);
+  input, select { background:#fff; border:1px solid var(--line); color:var(--txt);
                   border-radius:6px; padding:8px 9px; font-size:13px; width:100%; }
-  button.btn { background:var(--gold); color:#1a1a1a; border:none; border-radius:6px;
+  input:focus, select:focus { outline:none; border-color:var(--green); }
+  button.btn { background:var(--green); color:#fff; border:none; border-radius:6px;
                padding:9px 16px; font-weight:600; cursor:pointer; font-size:13px; }
+  button.btn:hover { background:var(--green-d); }
   button.btn:disabled { opacity:.5; cursor:default; }
-  button.ghost { background:none; border:1px solid var(--line); color:var(--muted);
+  button.ghost { background:#fff; border:1px solid var(--line); color:#33473a;
                  border-radius:6px; padding:6px 10px; cursor:pointer; font-size:12px; }
+  button.ghost:hover { background:var(--bg); }
   button.danger { border-color:var(--red); color:var(--red); }
+  button.danger:hover { background:rgba(192,57,43,.07); }
   .tablewrap { overflow-x:auto; }
   table { width:100%; border-collapse:collapse; font-size:13px; min-width:760px; }
-  th { text-align:left; color:var(--muted); font-weight:600; font-size:11px;
+  th { text-align:left; color:var(--muted); font-weight:700; font-size:11px;
        text-transform:uppercase; letter-spacing:.5px; padding:8px 10px;
-       border-bottom:1px solid var(--line); position:sticky; top:0; background:var(--panel); }
-  td { padding:7px 10px; border-bottom:1px solid var(--panel2); vertical-align:middle; }
-  tr.inactive td { opacity:.45; }
+       border-bottom:2px solid var(--line); position:sticky; top:0; background:var(--panel); }
+  td { padding:7px 10px; border-bottom:1px solid #eee; vertical-align:middle; }
+  tr.inactive td { opacity:.5; }
   td .em { font-weight:600; }
   td.sub { color:var(--muted); font-size:11px; }
   .pill { display:inline-block; padding:2px 9px; border-radius:20px; font-size:11px;
           font-weight:600; }
-  .pill.editor { background:rgba(63,174,107,.18); color:var(--green); }
-  .pill.read   { background:rgba(139,151,166,.18); color:var(--muted); }
+  .pill.editor { background:rgba(58,138,58,.14); color:var(--green-d); }
+  .pill.read   { background:rgba(106,138,106,.14); color:var(--muted); }
   .rowbtns { display:flex; gap:6px; justify-content:flex-end; }
   #msg { margin:0 0 14px; padding:10px 14px; border-radius:8px; font-size:13px; display:none; }
-  #msg.ok  { display:block; background:rgba(63,174,107,.15); color:var(--green); }
-  #msg.err { display:block; background:rgba(217,84,78,.15); color:var(--red); }
+  #msg.ok  { display:block; background:rgba(58,138,58,.12); color:var(--green-d); }
+  #msg.err { display:block; background:rgba(192,57,43,.10); color:#a32020; }
   .dirty input, .dirty select { border-color:var(--gold); }
   @media (max-width:760px){
     .addgrid { grid-template-columns:1fr 1fr; }
-    header h1 { font-size:15px; }
+    nav { margin-left:0; gap:12px; }
   }
 </style>
 </head>
