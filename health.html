@@ -185,7 +185,7 @@ function render(d){
 
   // databases
   document.getElementById('db-rows').innerHTML = (d.databases||[]).map(function(db){
-    var m = db.metric!=null ? (esc(db.metric_label||'')+': '+esc(db.metric)) : '';
+    var m = (db.metric!=null && db.metric_label) ? (esc(db.metric_label)+': '+esc(db.metric)) : '';
     var slow = db.ms!=null && db.ms>1000;
     return '<tr'+(db.ok?'':' class="bad"')+'><td>'+esc(db.label)+'</td>'+
       '<td>'+dot(db.ok?'green':'red')+(db.ok?'OK':'FAIL')+'</td>'+
