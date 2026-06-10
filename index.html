@@ -196,7 +196,7 @@ async function loadUsers() {
     var tr = document.createElement('tr');
     tr.className = u.active ? '' : 'inactive';
     tr.innerHTML =
-      '<td class="em">'+esc(u.email)+'</td>' +
+      '<td><input data-f="new_email" value="'+esc(u.email)+'" style="width:200px"></td>' +
       '<td><input data-f="display_name" value="'+esc(u.display_name)+'" style="width:90px"></td>' +
       '<td><input data-f="pbi_name" value="'+esc(u.pbi_name)+'" style="width:90px"></td>' +
       '<td><select data-f="role">'+roleOptions((u.role||'').toLowerCase())+'</select></td>' +
@@ -224,11 +224,16 @@ async function saveRow(tr, email, btn) {
   tr.querySelectorAll('[data-f]').forEach(function (el) {
     body[el.dataset.f] = el.type === 'checkbox' ? el.checked : el.value;
   });
+  var ne = (body.new_email||'').trim().toLowerCase();
+  if (ne && ne !== email && !confirm('Change email\n  from: '+email+'\n  to:   '+ne+'\nThis changes their sign-in identity.')) return;
   btn.disabled = true;
   var r = await api('/admin/users/' + encodeURIComponent(email), {
     method:'PUT', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body) });
-  if (r.ok) { tr.classList.remove('dirty'); flash('Saved '+email, true); }
-  else { btn.disabled=false; flash('Save failed: '+(await r.text()), false); }
+  if (r.ok) {
+    var j = await r.json(); tr.classList.remove('dirty');
+    flash('Saved '+(j.email||email), true);
+    if (j.email && j.email !== email) loadUsers();   // renamed — re-key the row
+  } else { btn.disabled=false; flash('Save failed: '+(await r.text()), false); }
 }
 
 async function delUser(email) {
