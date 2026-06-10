@@ -246,8 +246,9 @@ function render(d){
     }).join('');
   }
 
-  // tasks
-  var tasks = (d.tasks||[]).slice();
+  // tasks — drop one-shot/finished tasks (no next run), but keep anything
+  // currently running (the always-on services have no "next run" by nature).
+  var tasks = (d.tasks||[]).filter(function(x){ return x.next_run || x.result===267009; });
   var meta = tasks.map(function(x){ return Object.assign({}, x, {_r: taskResult(x.result, x.state)}); });
   var nBad = meta.filter(function(x){return x._r.bad;}).length;
   var nRun = meta.filter(function(x){return x.result===267009;}).length;
