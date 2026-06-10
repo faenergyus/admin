@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>FAE Admin — Review</title>
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="admin-shell.css">
+<style>
+  :root { --bg:#f5f4f1; --header:#d9d9d9; --panel:#fff; --panel2:#f7f6f2;
+          --line:#d8dadd; --txt:#1a1a1a; --muted:#6b7177;
+          --green:#5b626b; --green-d:#2b3036;
+          --red:#c0392b; --blue:#2b6cb0; --amber:#b7791f; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--txt);
+         font-family:-apple-system,"Segoe UI",Roboto,sans-serif; overflow-x:hidden; }
+  .gate { text-align:center; padding:80px 20px; color:var(--muted); }
+  .gate h2 { color:var(--green-d); }
+  .topline { display:flex; align-items:center; gap:14px; margin-bottom:16px; color:var(--muted); font-size:12px; }
+  .topline button { background:#fff; border:1px solid var(--line); color:#444a50;
+                    border-radius:6px; padding:5px 12px; cursor:pointer; font-size:12px; }
+  .topline button:hover { background:var(--bg); }
+  .intro { color:var(--muted); font-size:12.5px; margin:0 0 16px; max-width:760px; line-height:1.5; }
+  .item { background:var(--panel); border:1px solid var(--line); border-top:3px solid var(--amber);
+          border-radius:11px; padding:15px 18px; margin-bottom:16px; box-shadow:0 1px 3px rgba(0,0,0,.05); }
+  .item .head { display:flex; align-items:baseline; flex-wrap:wrap; gap:10px; margin-bottom:8px; }
+  .item .tid { font-weight:700; color:var(--green-d); font-size:14px; }
+  .item .ttl { font-weight:600; font-size:14px; flex:1 1 280px; min-width:0; word-break:break-word; }
+  .item .meta { color:var(--muted); font-size:11.5px; }
+  .prompt { background:var(--panel2); border:1px solid var(--line); border-radius:8px;
+            padding:11px 13px; font-size:12.5px; line-height:1.5; white-space:pre-wrap;
+            word-break:break-word; max-height:340px; overflow:auto; margin:8px 0 12px; }
+  .actions { display:flex; flex-wrap:wrap; gap:10px; align-items:center; }
+  .btn { border:1px solid var(--line); border-radius:7px; padding:7px 14px; cursor:pointer;
+         font-size:12.5px; font-weight:600; background:#fff; color:#374046; }
+  .btn:hover:not(:disabled){ background:var(--bg); }
+  .btn:disabled{ opacity:.45; cursor:default; }
+  .btn.open { background:#eef4fb; border-color:#bcd4ee; color:#1d4e80; text-decoration:none; }
+  .btn.approve { background:#eaf3ec; border-color:#bcdcc4; color:#256b39; }
+  .btn.requeue { background:#fbf3e6; border-color:#e6d2ad; color:#8a5a12; }
+  .rq { display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-left:auto; }
+  .rq select, .rq input { border:1px solid var(--line); border-radius:7px; padding:7px 10px; font-size:12.5px; background:#fff; }
+  .rq input { width:200px; max-width:48vw; }
+  .empty { text-align:center; color:var(--muted); padding:50px 20px; }
+  .empty .big { font-size:40px; margin-bottom:8px; }
+  .msg { font-size:12px; margin-left:6px; }
+  .msg.ok { color:#256b39; } .msg.err { color:var(--red); }
+  @media (max-width:760px){ .rq { margin-left:0; width:100%; } .rq input{ flex:1 1 auto; width:auto; } }
+</style>
+</head>
+<body data-page="review">
+<div class="app">
+  <header class="ahead">
+    <button class="burger" id="burger" aria-label="Toggle menu">&#9776;</button>
+    <img class="logo" src="light-40aclogo.png" alt="40ac" onerror="this.style.display='none'">
+    <span class="fae-appnav" data-current="admin"></span>
+    <span class="spacer"></span>
+    <div id="badge"></div>
+  </header>
+  <div class="asplit">
+    <aside class="asidebar"><nav>
+      <a href="index.html"  data-p="users"><span class="ic">&#9707;</span>Users</a>
+      <a href="health.html" data-p="health"><span class="ic">&#9829;</span>Health</a>
+      <a href="queue.html"  data-p="queue"><span class="ic">&#8801;</span>Queue</a>
+      <a href="review.html" data-p="review"><span class="ic">&#9873;</span>Review</a>
+    </nav></aside>
+    <main class="acontent">
+      <div id="gate" class="gate">Checking access…</div>
+      <div id="app" style="display:none">
+        <div class="topline">
+          <span id="ts">—</span>
+          <button id="refresh">↻ Refresh</button>
+          <label style="font-size:12px"><input type="checkbox" id="auto"> auto (30s)</label>
+        </div>
+        <p class="intro">Items the agents flagged as needing you — a judgment call or an
+          <code>--apply</code> gate. <b>Approve</b> closes the item as resolved.
+          <b>Re-queue</b> sends it back to a worker lane as a new task and closes this one.</p>
+        <div id="list"></div>
+      </div>
+    </main>
+  </div>
+</div>
+
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+<script src="admin-shell.js"></script>
+<script>
+const API = 'https://api.40ac.us';
+window.faeApiBase = API;
+const GOOGLE_CLIENT_ID = '629380732564-eh0uasomqjdo3up8o2po685g9ep544iq.apps.googleusercontent.com';
+const SESSION_KEY = 'fae_user';
+const LANES = ['analyst','scada','forms','trend','db','land','map','wbd','admin'];
+
+(function () {
+  try {
+    var m = document.cookie.match(/(?:^|;\s*)fae40_sso=([^;]+)/);
+    if (m && !localStorage.getItem(SESSION_KEY))
+      localStorage.setItem(SESSION_KEY, decodeURIComponent(m[1]));
+  } catch (e) {}
+  try {
+    var _set = localStorage.setItem.bind(localStorage), _rem = localStorage.removeItem.bind(localStorage);
+    localStorage.setItem = function (k, v) { _set(k, v);
+      if (k === SESSION_KEY) { try { document.cookie = 'fae40_sso=' + encodeURIComponent(v) +
+        ';domain=.40ac.us;path=/;max-age=2592000;Secure;SameSite=Lax'; } catch (e) {} } };
+    localStorage.removeItem = function (k) { _rem(k);
+      if (k === SESSION_KEY) { try { document.cookie =
+        'fae40_sso=;domain=.40ac.us;path=/;max-age=0;Secure;SameSite=Lax'; } catch (e) {} } };
+  } catch (e) {}
+})();
+
+function session() { try { return JSON.parse(localStorage.getItem(SESSION_KEY) || 'null'); } catch (e) { return null; } }
+function signOut() { localStorage.removeItem(SESSION_KEY); location.reload(); }
+function esc(s){ return (s==null?'':String(s)).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];}); }
+function showGate(html){ var g=document.getElementById('gate'); g.style.display='block'; g.innerHTML=html; }
+
+function handleCredential(resp) {
+  try {
+    var p = JSON.parse(atob(resp.credential.split('.')[1].replace(/-/g,'+').replace(/_/g,'/')));
+    localStorage.setItem(SESSION_KEY, JSON.stringify({ credential: resp.credential, email: p.email,
+      displayName: p.name || p.email, picture: p.picture, expires: Date.now()+30*86400*1000 }));
+    location.reload();
+  } catch (e) { showGate('<h2>Sign-in failed</h2>'); }
+}
+function renderSignIn() {
+  showGate('<h2>FAE Admin</h2><p>Admin-only. Sign in with your FAE Google account.</p>' +
+           '<div id="gbtn" style="display:flex;justify-content:center;margin-top:18px"></div>');
+  (function draw(){ if(!(window.google&&google.accounts&&google.accounts.id)) return setTimeout(draw,200);
+    google.accounts.id.initialize({client_id:GOOGLE_CLIENT_ID, callback:handleCredential});
+    google.accounts.id.renderButton(document.getElementById('gbtn'),{theme:'filled_black',size:'large'}); })();
+}
+
+function fmtAge(s){
+  if (s==null) return '—';
+  s=Math.max(0,s); var d=Math.floor(s/86400),h=Math.floor(s%86400/3600),m=Math.floor(s%3600/60);
+  if (d) return d+'d '+h+'h'; if (h) return h+'h '+m+'m'; if (m) return m+'m'; return s+'s';
+}
+
+// Pull a clickable "live" target out of the prompt: a real URL first, then a
+// bare 40ac.us path, then fall back to the named app's home. Null if nothing.
+function liveLink(prompt){
+  if (!prompt) return null;
+  var m = prompt.match(/https?:\/\/[^\s)>\]"']+/i);
+  if (m) return m[0].replace(/[.,;]+$/,'');
+  m = prompt.match(/\b([a-z0-9-]+\.40ac\.us(?:\/[^\s)>\]"']*)?)/i);
+  if (m) return 'https://' + m[1].replace(/[.,;]+$/,'');
+  m = prompt.match(/\b(analyst|scada|forms|map|admin)\b/i);
+  if (m) return 'https://' + m[1].toLowerCase() + '.40ac.us';
+  return null;
+}
+
+function render(d){
+  document.getElementById('ts').textContent = 'as of ' + d.generated_at + ' (server) · ' + d.count + ' item(s)';
+  var items = d.items || [];
+  var list = document.getElementById('list');
+  if (!items.length) {
+    list.innerHTML = '<div class="empty"><div class="big">✓</div>Nothing waiting on you. The orchestrator has no human-gated items pending.</div>';
+    return;
+  }
+  list.innerHTML = items.map(function(x){
+    var link = liveLink(x.prompt);
+    var opts = LANES.map(function(l){ return '<option value="'+l+'">'+l+'</option>'; }).join('');
+    return '<div class="item" data-id="'+x.id+'">'+
+      '<div class="head">'+
+        '<span class="tid">#'+x.id+'</span>'+
+        '<span class="ttl">'+esc(x.title||'(untitled)')+'</span>'+
+        '<span class="meta">age '+fmtAge(x.age_sec)+' · pri '+esc(x.priority)+' · by '+esc((x.created_by||'').replace('service-',''))+'</span>'+
+      '</div>'+
+      '<div class="prompt">'+esc(x.prompt||'(no prompt)')+'</div>'+
+      '<div class="actions">'+
+        (link ? '<a class="btn open" href="'+esc(link)+'" target="_blank" rel="noopener">Open live ↗</a>' : '')+
+        '<button class="btn approve" data-act="approve">✓ Approve</button>'+
+        '<span class="rq">'+
+          '<select class="rq-target" title="lane to re-queue to">'+opts+'</select>'+
+          '<input class="rq-note" type="text" placeholder="note (optional)">'+
+          '<button class="btn requeue" data-act="requeue">↻ Re-queue</button>'+
+        '</span>'+
+        '<span class="msg"></span>'+
+      '</div>'+
+    '</div>';
+  }).join('');
+}
+
+async function load(){
+  var btn=document.getElementById('refresh'); btn.disabled=true; btn.textContent='…';
+  try {
+    var r = await window.faeAuth.fetchAuthed(API, API+'/admin/review/items');
+    if (r.ok) render(await r.json());
+    else document.getElementById('ts').textContent='load error '+r.status;
+  } catch(e){ document.getElementById('ts').textContent='load error'; }
+  btn.disabled=false; btn.textContent='↻ Refresh';
+}
+
+async function act(item, kind){
+  var id = item.getAttribute('data-id');
+  var msg = item.querySelector('.msg');
+  var btns = item.querySelectorAll('button');
+  btns.forEach(function(b){ b.disabled=true; });
+  msg.className='msg'; msg.textContent='working…';
+  try {
+    var url, opts={method:'POST'};
+    if (kind==='approve') {
+      url = API+'/admin/review/items/'+id+'/resolve';
+    } else {
+      var target = item.querySelector('.rq-target').value;
+      var note = item.querySelector('.rq-note').value || '';
+      url = API+'/admin/review/items/'+id+'/requeue';
+      opts.headers = {'Content-Type':'application/json'};
+      opts.body = JSON.stringify({target:target, note:note});
+    }
+    var r = await window.faeAuth.fetchAuthed(API, url, opts);
+    if (r.ok) {
+      var j = await r.json();
+      msg.className='msg ok';
+      msg.textContent = kind==='approve' ? 'resolved ✓' : ('re-queued to '+j.requeued_to+' as #'+j.new_id+' ✓');
+      var card = item;
+      setTimeout(function(){ card.style.transition='opacity .3s'; card.style.opacity='.35'; setTimeout(load, 350); }, 600);
+    } else {
+      var t = await r.text();
+      msg.className='msg err'; msg.textContent='error '+r.status+': '+t.slice(0,120);
+      btns.forEach(function(b){ b.disabled=false; });
+    }
+  } catch(e){
+    msg.className='msg err'; msg.textContent='request failed';
+    btns.forEach(function(b){ b.disabled=false; });
+  }
+}
+
+let timer=null;
+function setAuto(){ if(timer) clearInterval(timer); if(document.getElementById('auto').checked) timer=setInterval(load,30000); }
+
+async function boot(){
+  var s=session();
+  if (!s) { renderSignIn(); return; }
+  document.getElementById('badge').innerHTML =
+    '<span>'+esc(s.displayName||s.email||'')+'</span><button onclick="signOut()">Sign out</button>';
+  try { await window.faeAuth.ensureSessionToken(API); } catch(e){}
+  var role=null; try { role=await window.faeAuth.ensureUserRole(true); } catch(e){}
+  if (role!=='admin') { showGate('<h2>Not authorized</h2><p>Admin only'+(role?' — your role is <b>'+esc(role)+'</b>':'')+'.</p>'); return; }
+  document.getElementById('gate').style.display='none';
+  document.getElementById('app').style.display='block';
+  document.getElementById('refresh').addEventListener('click', load);
+  document.getElementById('auto').addEventListener('change', setAuto);
+  document.getElementById('list').addEventListener('click', function(ev){
+    var b = ev.target.closest('button[data-act]'); if(!b) return;
+    var item = ev.target.closest('.item'); if(!item) return;
+    act(item, b.getAttribute('data-act'));
+  });
+  await load(); setAuto();
+}
+window.addEventListener('DOMContentLoaded', boot);
+</script>
+<script src="fae-auth.js?v=12"></script>
+<script src="fae-header.js?v=2"></script>
+</body>
+</html>
