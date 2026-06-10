@@ -62,6 +62,11 @@
   .pgbtn:hover:not(:disabled) { background:var(--bg); }
   .pgbtn:disabled { opacity:.4; cursor:default; }
   #range { font-size:12px; color:var(--muted); }
+  /* Excel-AutoFilter-style per-column filter row (matches gas analysis) */
+  thead tr.frow th { padding:4px 6px; background:#f2f3f5; border-bottom:2px solid var(--line); }
+  thead tr.frow input { width:100%; box-sizing:border-box; font-size:11px; padding:4px 6px;
+                        border:1px solid var(--line); border-radius:4px; background:#fff; color:var(--txt); }
+  thead tr.frow input:focus { outline:none; border-color:#888; }
   tr.needs td { background:rgba(192,57,43,.15); }
   tr.needs td.title { color:#a32020; font-weight:700; }
 </style>
@@ -107,10 +112,20 @@
             <button class="pgbtn" id="prev">‹ Prev 50</button>
             <span id="range">—</span>
             <button class="pgbtn" id="next">Next 50 ›</button>
-            <label style="margin-left:auto"><input type="checkbox" id="active-only"> active only (this page)</label>
+            <button class="pgbtn" id="resetf" style="margin-left:auto">↺ Reset filters</button>
           </div>
           <div class="tablewrap"><table>
-            <thead><tr><th>#</th><th>Lane</th><th>Title</th><th>Status</th><th>Age</th><th>Run</th><th>By</th></tr></thead>
+            <thead>
+              <tr><th>#</th><th>Lane</th><th>Title</th><th>Status</th><th>Age</th><th>Run</th><th>By</th></tr>
+              <tr class="frow">
+                <th></th>
+                <th><input id="f-target" placeholder="filter…" autocomplete="off"></th>
+                <th><input id="f-q" placeholder="search words…" autocomplete="off"></th>
+                <th><input id="f-status" placeholder="filter…" autocomplete="off"></th>
+                <th></th><th></th>
+                <th><input id="f-by" placeholder="filter…" autocomplete="off"></th>
+              </tr>
+            </thead>
             <tbody id="rows"></tbody>
           </table></div>
         </div>
@@ -205,16 +220,13 @@ function render(d){
     return '<span class="chip"><b>'+esc(t)+'</b> &nbsp;'+parts.join(' · ')+'</span>';
   }).join('') : '<span class="chip none">queue is clear — nothing pending or running</span>';
 
-  // tasks (paged). NEEDS RYAN tasks render red.
-  var pageRows=(d.recent||[]);
+  // tasks (server-filtered + paged). NEEDS RYAN tasks render red.
+  var rows=(d.recent||[]);
   var total=d.total||0, off=d.offset||0, lim=d.limit||50;
-  var from = total ? off+1 : 0, to = off + pageRows.length;
-  document.getElementById('range').textContent = from+'–'+to+' of '+total;
+  var from = total ? off+1 : 0, to = off + rows.length;
+  document.getElementById('range').textContent = from+'–'+to+' of '+total+(d.filtered?' (filtered)':'');
   document.getElementById('prev').disabled = off<=0;
   document.getElementById('next').disabled = (off+lim) >= total;
-  var rows=pageRows.slice();
-  if (document.getElementById('active-only').checked)
-    rows=rows.filter(function(x){ return x.status==='pending'||x.status==='in_progress'; });
   document.getElementById('rows').innerHTML = rows.map(function(x){
     var b=statusBadge(x.status);
     var needs=/needs\s*ryan/i.test(x.title||'') && x.status!=='done';
@@ -231,10 +243,18 @@ function render(d){
 }
 
 let pageOffset=0;
+function filterQS(){
+  var p='offset='+pageOffset+'&limit=50';
+  [['q','f-q'],['target','f-target'],['status','f-status'],['by','f-by']].forEach(function(pair){
+    var el=document.getElementById(pair[1]); var v=el?el.value.trim():'';
+    if (v) p+='&'+pair[0]+'='+encodeURIComponent(v);
+  });
+  return p;
+}
 async function load(){
   var btn=document.getElementById('refresh'); btn.disabled=true; btn.textContent='…';
   try {
-    var r = await window.faeAuth.fetchAuthed(API, API+'/admin/queue?offset='+pageOffset+'&limit=50');
+    var r = await window.faeAuth.fetchAuthed(API, API+'/admin/queue?'+filterQS());
     if (r.ok) render(await r.json());
     else document.getElementById('ts').textContent='load error '+r.status;
   } catch(e){ document.getElementById('ts').textContent='load error'; }
@@ -255,7 +275,15 @@ async function boot(){
   document.getElementById('app').style.display='block';
   document.getElementById('refresh').addEventListener('click', load);
   document.getElementById('auto').addEventListener('change', setAuto);
-  document.getElementById('active-only').addEventListener('change', function(){ if(LAST) render(LAST); });
+  var _fd=null;
+  function onFilter(){ if(_fd) clearTimeout(_fd); _fd=setTimeout(function(){ pageOffset=0; load(); }, 300); }
+  ['f-q','f-target','f-status','f-by'].forEach(function(id){
+    var el=document.getElementById(id); if(el) el.addEventListener('input', onFilter);
+  });
+  document.getElementById('resetf').addEventListener('click', function(){
+    ['f-q','f-target','f-status','f-by'].forEach(function(id){ var el=document.getElementById(id); if(el) el.value=''; });
+    pageOffset=0; load();
+  });
   document.getElementById('prev').addEventListener('click', function(){ pageOffset=Math.max(0,pageOffset-50); load(); });
   document.getElementById('next').addEventListener('click', function(){ pageOffset+=50; load(); });
   await load(); setAuto();
