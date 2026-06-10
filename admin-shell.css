@@ -1,0 +1,41 @@
+/* Shared admin chrome — top header (with hamburger) + collapsible left sidebar.
+   Uses the page's :root vars (--header,--panel,--line,--txt,--muted,--green,--green-d).
+   Page body must carry data-page="users|health|queue" and the .app/.ahead/.asplit
+   /.asidebar/.acontent structure (see any admin page). */
+.app { display:flex; flex-direction:column; height:100vh; }
+.ahead { display:flex; align-items:center; gap:12px; height:54px; padding:0 12px;
+         background:var(--header); box-shadow:0 2px 8px rgba(0,0,0,.18); z-index:30; flex-shrink:0; }
+.burger { background:none; border:0; font-size:1.35rem; line-height:1; cursor:pointer;
+          color:#33373c; padding:4px 9px; border-radius:5px; }
+.burger:hover { background:rgba(0,0,0,.08); }
+.ahead .logo { height:36px; display:block; }
+.ahead h1 { font-size:1rem; margin:0; font-weight:800; color:var(--green-d); letter-spacing:.3px; }
+.ahead .spacer { flex:1; }
+#badge { font-size:.78rem; color:#1f1f1f; display:flex; align-items:center; gap:8px;
+         padding-left:16px; border-left:1px solid #bcbcbc; }
+#badge button { background:none; border:0; color:#3a3a3a; text-decoration:underline;
+                cursor:pointer; font-size:.7rem; padding:0; }
+
+.asplit { display:flex; flex:1; overflow:hidden; position:relative; }
+.asidebar { width:206px; background:var(--panel); border-right:1px solid var(--line);
+            flex-shrink:0; overflow:auto; transition:width .15s ease; }
+body:not(.sb-open) .asidebar { width:0; border-right-color:transparent; }
+.asidebar nav { padding:10px 0; }
+.asidebar a { display:flex; align-items:center; gap:11px; padding:11px 18px; white-space:nowrap;
+              font-size:.9rem; color:#333; text-decoration:none; cursor:pointer;
+              border-left:3px solid transparent; }
+.asidebar a:hover { background:rgba(0,0,0,.05); }
+.asidebar a.active { border-left-color:var(--green); background:rgba(0,0,0,.06);
+                     font-weight:700; color:#1a1a1a; }
+.asidebar a .ic { width:18px; text-align:center; opacity:.75; font-size:1rem; }
+
+.acontent { flex:1; overflow:auto; padding:22px 24px; }
+
+@media (max-width:760px) {
+  .asidebar { position:absolute; top:0; bottom:0; left:0; z-index:25; width:206px;
+              box-shadow:2px 0 14px rgba(0,0,0,.22); }
+  body:not(.sb-open) .asidebar { width:206px; transform:translateX(-100%);
+                                 box-shadow:none; border-right-color:transparent; }
+  body.sb-open .asidebar { transform:translateX(0); }
+  .acontent { padding:16px 14px; }
+}

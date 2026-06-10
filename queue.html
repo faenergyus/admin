@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>FAE Admin — Agent Queue</title>
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="admin-shell.css">
+<style>
+  :root { --bg:#f5f4f1; --header:#d9d9d9; --panel:#fff; --panel2:#f7f6f2;
+          --line:#d8dadd; --txt:#1a1a1a; --muted:#6b7177;
+          --green:#5b626b; --green-d:#2b3036;
+          --red:#c0392b; --blue:#2b6cb0; --amber:#b7791f; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--txt);
+         font-family:-apple-system,"Segoe UI",Roboto,sans-serif; overflow-x:hidden; }
+  /* header + sidebar chrome lives in admin-shell.css */
+  .gate { text-align:center; padding:80px 20px; color:var(--muted); }
+  .gate h2 { color:var(--green-d); }
+  .topline { display:flex; align-items:center; gap:14px; margin-bottom:16px; color:var(--muted); font-size:12px; }
+  .topline button { background:#fff; border:1px solid var(--line); color:#444a50;
+                    border-radius:6px; padding:5px 12px; cursor:pointer; font-size:12px; }
+  .topline button:hover { background:var(--bg); }
+  .card { background:var(--panel); border:1px solid var(--line); border-top:3px solid var(--green);
+          border-radius:11px; padding:16px 18px; margin-bottom:18px; box-shadow:0 1px 3px rgba(0,0,0,.05); }
+  .card h3 { margin:0 0 14px; font-size:.62rem; text-transform:uppercase; letter-spacing:.12em;
+             font-weight:700; color:#9aa0a6; }
+  .dot { display:inline-block; width:9px; height:9px; border-radius:50%; margin-right:7px; vertical-align:middle; }
+  .green{background:var(--green)} .red{background:var(--red)} .blue{background:var(--blue)}
+  .amber{background:var(--amber)} .dim{background:#9aa0a6}
+  .kpis { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:12px; }
+  .kpi { background:var(--panel2); border:1px solid var(--line); border-radius:8px; padding:12px 14px; }
+  .kpi .lbl { font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:.4px; }
+  .kpi .val { font-size:22px; font-weight:700; margin-top:5px; }
+  .kpi .sub { font-size:11px; color:var(--muted); margin-top:3px; }
+  .chips { display:flex; flex-wrap:wrap; gap:8px; }
+  .chip { background:var(--panel2); border:1px solid var(--line); border-radius:18px;
+          padding:4px 12px; font-size:12px; }
+  .chip b { font-weight:700; }
+  .chip.none { color:var(--muted); }
+  table { width:100%; border-collapse:collapse; font-size:13px; }
+  th { text-align:left; color:var(--muted); font-weight:700; font-size:11px; text-transform:uppercase;
+       letter-spacing:.5px; padding:8px 10px; border-bottom:2px solid var(--line); }
+  td { padding:7px 10px; border-bottom:1px solid #eee; vertical-align:middle; }
+  tr.bad td { background:rgba(192,57,43,.07); }
+  td.id { color:var(--muted); font-size:11px; }
+  td.title { max-width:380px; }
+  .sub2 { color:var(--muted); font-size:11px; }
+  .badge { display:inline-block; padding:2px 9px; border-radius:20px; font-size:11px; font-weight:600; }
+  .b-amber{background:rgba(183,121,31,.16);color:#8a5a12}
+  .b-blue{background:rgba(43,108,176,.14);color:#1d4e80}
+  .b-red{background:rgba(192,57,43,.12);color:#a32020}
+  .b-dim{background:rgba(106,138,106,.14);color:var(--muted)}
+  .tablewrap { overflow-x:auto; }
+  .filters { display:flex; gap:14px; margin-bottom:10px; font-size:12px; color:var(--muted); align-items:center; }
+  .filters label { cursor:pointer; }
+</style>
+</head>
+<body data-page="queue">
+<div class="app">
+  <header class="ahead">
+    <button class="burger" id="burger" aria-label="Toggle menu">&#9776;</button>
+    <img class="logo" src="light-40aclogo.png" alt="40ac" onerror="this.style.display='none'">
+    <h1>Admin</h1>
+    <span class="spacer"></span>
+    <div id="badge"></div>
+  </header>
+  <div class="asplit">
+    <aside class="asidebar"><nav>
+      <a href="index.html"  data-p="users"><span class="ic">&#9707;</span>Users</a>
+      <a href="health.html" data-p="health"><span class="ic">&#9829;</span>Health</a>
+      <a href="queue.html"  data-p="queue"><span class="ic">&#8801;</span>Queue</a>
+    </nav></aside>
+    <main class="acontent">
+      <div id="gate" class="gate">Checking access…</div>
+      <div id="app" style="display:none">
+        <div class="topline">
+          <span id="ts">—</span>
+          <button id="refresh">↻ Refresh</button>
+          <label style="font-size:12px"><input type="checkbox" id="auto" checked> auto (20s)</label>
+        </div>
+
+        <div class="card">
+          <h3>Agent task queue</h3>
+          <div class="kpis" id="kpis"></div>
+        </div>
+
+        <div class="card">
+          <h3>Waiting / running by lane</h3>
+          <div class="chips" id="lanes"></div>
+        </div>
+
+        <div class="card">
+          <h3>Recent tasks (<span id="rcount">0</span>)</h3>
+          <div class="filters">
+            <label><input type="checkbox" id="active-only"> active only (pending / in&nbsp;progress)</label>
+          </div>
+          <div class="tablewrap"><table>
+            <thead><tr><th>#</th><th>Lane</th><th>Title</th><th>Status</th><th>Age</th><th>Run</th><th>By</th></tr></thead>
+            <tbody id="rows"></tbody>
+          </table></div>
+        </div>
+      </div>
+    </main>
+  </div>
+</div>
+
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+<script src="admin-shell.js"></script>
+<script>
+const API = 'https://api.40ac.us';
+window.faeApiBase = API;
+const GOOGLE_CLIENT_ID = '629380732564-eh0uasomqjdo3up8o2po685g9ep544iq.apps.googleusercontent.com';
+const SESSION_KEY = 'fae_user';
+
+(function () {
+  try {
+    var m = document.cookie.match(/(?:^|;\s*)fae40_sso=([^;]+)/);
+    if (m && !localStorage.getItem(SESSION_KEY))
+      localStorage.setItem(SESSION_KEY, decodeURIComponent(m[1]));
+  } catch (e) {}
+  try {
+    var _set = localStorage.setItem.bind(localStorage), _rem = localStorage.removeItem.bind(localStorage);
+    localStorage.setItem = function (k, v) { _set(k, v);
+      if (k === SESSION_KEY) { try { document.cookie = 'fae40_sso=' + encodeURIComponent(v) +
+        ';domain=.40ac.us;path=/;max-age=2592000;Secure;SameSite=Lax'; } catch (e) {} } };
+    localStorage.removeItem = function (k) { _rem(k);
+      if (k === SESSION_KEY) { try { document.cookie =
+        'fae40_sso=;domain=.40ac.us;path=/;max-age=0;Secure;SameSite=Lax'; } catch (e) {} } };
+  } catch (e) {}
+})();
+
+function session() { try { return JSON.parse(localStorage.getItem(SESSION_KEY) || 'null'); } catch (e) { return null; } }
+function signOut() { localStorage.removeItem(SESSION_KEY); location.reload(); }
+function esc(s){ return (s==null?'':String(s)).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];}); }
+function showGate(html){ var g=document.getElementById('gate'); g.style.display='block'; g.innerHTML=html; }
+
+function handleCredential(resp) {
+  try {
+    var p = JSON.parse(atob(resp.credential.split('.')[1].replace(/-/g,'+').replace(/_/g,'/')));
+    localStorage.setItem(SESSION_KEY, JSON.stringify({ credential: resp.credential, email: p.email,
+      displayName: p.name || p.email, picture: p.picture, expires: Date.now()+30*86400*1000 }));
+    location.reload();
+  } catch (e) { showGate('<h2>Sign-in failed</h2>'); }
+}
+function renderSignIn() {
+  showGate('<h2>FAE Admin</h2><p>Admin-only. Sign in with your FAE Google account.</p>' +
+           '<div id="gbtn" style="display:flex;justify-content:center;margin-top:18px"></div>');
+  (function draw(){ if(!(window.google&&google.accounts&&google.accounts.id)) return setTimeout(draw,200);
+    google.accounts.id.initialize({client_id:GOOGLE_CLIENT_ID, callback:handleCredential});
+    google.accounts.id.renderButton(document.getElementById('gbtn'),{theme:'filled_black',size:'large'}); })();
+}
+
+function dot(c){ return '<span class="dot '+c+'"></span>'; }
+function fmtAge(s){
+  if (s==null) return '—';
+  s=Math.max(0,s); var d=Math.floor(s/86400),h=Math.floor(s%86400/3600),m=Math.floor(s%3600/60);
+  if (d) return d+'d '+h+'h'; if (h) return h+'h '+m+'m'; if (m) return m+'m'; return s+'s';
+}
+function statusBadge(st){
+  if (st==='failed') return {t:'failed', c:'b-red', bad:true};
+  if (st==='in_progress' || st==='running') return {t:'in progress', c:'b-blue'};
+  if (st==='pending') return {t:'pending', c:'b-amber'};
+  if (st==='done') return {t:'done', c:'b-dim'};
+  return {t:esc(st||'?'), c:'b-dim'};
+}
+
+let LAST=null;
+function render(d){
+  LAST=d;
+  document.getElementById('ts').textContent = 'as of ' + d.generated_at + ' (server)';
+  var bs = d.by_status||{};
+  var oldAmber = (d.oldest_pending_sec||0) > 1800;
+  document.getElementById('kpis').innerHTML = [
+    ['Pending', dot((bs.pending||0)>0?'amber':'dim') + (bs.pending||0), 'waiting to claim'],
+    ['In progress', dot((bs.in_progress||0)>0?'blue':'dim') + (bs.in_progress||0), 'being worked'],
+    ['Failed (24h)', dot((d.failed_24h||0)>0?'red':'dim') + (d.failed_24h||0), 'last 24 hours'],
+    ['Oldest pending', '<span'+(oldAmber?' style="color:var(--amber)"':'')+'>'+fmtAge(d.oldest_pending_sec)+'</span>', oldAmber?'aging':'waiting'],
+    ['Done', (bs.done||0), 'completed (all-time)'],
+  ].map(function(k){ return '<div class="kpi"><div class="lbl">'+k[0]+'</div><div class="val">'+k[1]+
+      '</div><div class="sub">'+k[2]+'</div></div>'; }).join('');
+
+  // lanes
+  var lanes = {};
+  Object.keys(d.pending_by_target||{}).forEach(function(t){ lanes[t]=lanes[t]||{}; lanes[t].p=d.pending_by_target[t]; });
+  Object.keys(d.in_progress_by_target||{}).forEach(function(t){ lanes[t]=lanes[t]||{}; lanes[t].r=d.in_progress_by_target[t]; });
+  var keys = Object.keys(lanes).sort();
+  document.getElementById('lanes').innerHTML = keys.length ? keys.map(function(t){
+    var l=lanes[t]; var parts=[];
+    if (l.p) parts.push(l.p+' pending'); if (l.r) parts.push(l.r+' running');
+    return '<span class="chip"><b>'+esc(t)+'</b> &nbsp;'+parts.join(' · ')+'</span>';
+  }).join('') : '<span class="chip none">queue is clear — nothing pending or running</span>';
+
+  // recent
+  var rows=(d.recent||[]).slice();
+  var activeOnly=document.getElementById('active-only').checked;
+  if (activeOnly) rows=rows.filter(function(x){ return x.status==='pending'||x.status==='in_progress'; });
+  document.getElementById('rcount').textContent=rows.length;
+  document.getElementById('rows').innerHTML = rows.map(function(x){
+    var b=statusBadge(x.status);
+    return '<tr'+(b.bad?' class="bad"':'')+'>'+
+      '<td class="id">'+x.id+'</td>'+
+      '<td class="sub2">'+esc(x.target)+'</td>'+
+      '<td class="title">'+esc(x.title)+'</td>'+
+      '<td><span class="badge '+b.c+'">'+b.t+'</span></td>'+
+      '<td class="sub2">'+fmtAge(x.age_sec)+'</td>'+
+      '<td class="sub2">'+(x.run_sec!=null?fmtAge(x.run_sec):'—')+'</td>'+
+      '<td class="sub2">'+esc((x.created_by||'').replace('service-',''))+'</td></tr>';
+  }).join('');
+}
+
+async function load(){
+  var btn=document.getElementById('refresh'); btn.disabled=true; btn.textContent='…';
+  try {
+    var r = await window.faeAuth.fetchAuthed(API, API+'/admin/queue');
+    if (r.ok) render(await r.json());
+    else document.getElementById('ts').textContent='load error '+r.status;
+  } catch(e){ document.getElementById('ts').textContent='load error'; }
+  btn.disabled=false; btn.textContent='↻ Refresh';
+}
+let timer=null;
+function setAuto(){ if(timer) clearInterval(timer); if(document.getElementById('auto').checked) timer=setInterval(load,20000); }
+
+async function boot(){
+  var s=session();
+  if (!s) { renderSignIn(); return; }
+  document.getElementById('badge').innerHTML =
+    '<span>'+esc(s.displayName||s.email||'')+'</span><button onclick="signOut()">Sign out</button>';
+  try { await window.faeAuth.ensureSessionToken(API); } catch(e){}
+  var role=null; try { role=await window.faeAuth.ensureUserRole(true); } catch(e){}
+  if (role!=='admin') { showGate('<h2>Not authorized</h2><p>Admin only'+(role?' — your role is <b>'+esc(role)+'</b>':'')+'.</p>'); return; }
+  document.getElementById('gate').style.display='none';
+  document.getElementById('app').style.display='block';
+  document.getElementById('refresh').addEventListener('click', load);
+  document.getElementById('auto').addEventListener('change', setAuto);
+  document.getElementById('active-only').addEventListener('change', function(){ if(LAST) render(LAST); });
+  await load(); setAuto();
+}
+window.addEventListener('DOMContentLoaded', boot);
+</script>
+<script src="fae-auth.js?v=12"></script>
+</body>
+</html>
