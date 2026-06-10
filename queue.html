@@ -54,6 +54,13 @@
   .tablewrap { overflow-x:auto; }
   .filters { display:flex; gap:14px; margin-bottom:10px; font-size:12px; color:var(--muted); align-items:center; }
   .filters label { cursor:pointer; }
+  .pgbtn { background:#fff; border:1px solid var(--line); color:#444a50; border-radius:6px;
+           padding:5px 12px; cursor:pointer; font-size:12px; }
+  .pgbtn:hover:not(:disabled) { background:var(--bg); }
+  .pgbtn:disabled { opacity:.4; cursor:default; }
+  #range { font-size:12px; color:var(--muted); }
+  tr.needs td { background:rgba(192,57,43,.15); }
+  tr.needs td.title { color:#a32020; font-weight:700; }
 </style>
 </head>
 <body data-page="queue">
@@ -91,9 +98,12 @@
         </div>
 
         <div class="card">
-          <h3>Recent tasks (<span id="rcount">0</span>)</h3>
+          <h3>Tasks</h3>
           <div class="filters">
-            <label><input type="checkbox" id="active-only"> active only (pending / in&nbsp;progress)</label>
+            <button class="pgbtn" id="prev">‹ Prev 50</button>
+            <span id="range">—</span>
+            <button class="pgbtn" id="next">Next 50 ›</button>
+            <label style="margin-left:auto"><input type="checkbox" id="active-only"> active only (this page)</label>
           </div>
           <div class="tablewrap"><table>
             <thead><tr><th>#</th><th>Lane</th><th>Title</th><th>Status</th><th>Age</th><th>Run</th><th>By</th></tr></thead>
@@ -191,14 +201,21 @@ function render(d){
     return '<span class="chip"><b>'+esc(t)+'</b> &nbsp;'+parts.join(' · ')+'</span>';
   }).join('') : '<span class="chip none">queue is clear — nothing pending or running</span>';
 
-  // recent
-  var rows=(d.recent||[]).slice();
-  var activeOnly=document.getElementById('active-only').checked;
-  if (activeOnly) rows=rows.filter(function(x){ return x.status==='pending'||x.status==='in_progress'; });
-  document.getElementById('rcount').textContent=rows.length;
+  // tasks (paged). NEEDS RYAN tasks render red.
+  var pageRows=(d.recent||[]);
+  var total=d.total||0, off=d.offset||0, lim=d.limit||50;
+  var from = total ? off+1 : 0, to = off + pageRows.length;
+  document.getElementById('range').textContent = from+'–'+to+' of '+total;
+  document.getElementById('prev').disabled = off<=0;
+  document.getElementById('next').disabled = (off+lim) >= total;
+  var rows=pageRows.slice();
+  if (document.getElementById('active-only').checked)
+    rows=rows.filter(function(x){ return x.status==='pending'||x.status==='in_progress'; });
   document.getElementById('rows').innerHTML = rows.map(function(x){
     var b=statusBadge(x.status);
-    return '<tr'+(b.bad?' class="bad"':'')+'>'+
+    var needs=/needs\s*ryan/i.test(x.title||'');
+    var cls = needs ? 'needs' : (b.bad ? 'bad' : '');
+    return '<tr'+(cls?' class="'+cls+'"':'')+'>'+
       '<td class="id">'+x.id+'</td>'+
       '<td class="sub2">'+esc(x.target)+'</td>'+
       '<td class="title">'+esc(x.title)+'</td>'+
@@ -209,10 +226,11 @@ function render(d){
   }).join('');
 }
 
+let pageOffset=0;
 async function load(){
   var btn=document.getElementById('refresh'); btn.disabled=true; btn.textContent='…';
   try {
-    var r = await window.faeAuth.fetchAuthed(API, API+'/admin/queue');
+    var r = await window.faeAuth.fetchAuthed(API, API+'/admin/queue?offset='+pageOffset+'&limit=50');
     if (r.ok) render(await r.json());
     else document.getElementById('ts').textContent='load error '+r.status;
   } catch(e){ document.getElementById('ts').textContent='load error'; }
@@ -234,6 +252,8 @@ async function boot(){
   document.getElementById('refresh').addEventListener('click', load);
   document.getElementById('auto').addEventListener('change', setAuto);
   document.getElementById('active-only').addEventListener('change', function(){ if(LAST) render(LAST); });
+  document.getElementById('prev').addEventListener('click', function(){ pageOffset=Math.max(0,pageOffset-50); load(); });
+  document.getElementById('next').addEventListener('click', function(){ pageOffset+=50; load(); });
   await load(); setAuto();
 }
 window.addEventListener('DOMContentLoaded', boot);
