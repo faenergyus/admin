@@ -217,7 +217,7 @@ function render(d){
     rows=rows.filter(function(x){ return x.status==='pending'||x.status==='in_progress'; });
   document.getElementById('rows').innerHTML = rows.map(function(x){
     var b=statusBadge(x.status);
-    var needs=/needs\s*ryan/i.test(x.title||'');
+    var needs=/needs\s*ryan/i.test(x.title||'') && x.status!=='done';
     var cls = needs ? 'needs' : (b.bad ? 'bad' : '');
     return '<tr'+(cls?' class="'+cls+'"':'')+'>'+
       '<td class="id">'+x.id+'</td>'+
