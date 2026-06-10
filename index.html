@@ -16,6 +16,9 @@
            background:var(--panel); border-bottom:1px solid var(--line); }
   header img { height:34px; }
   header h1 { font-size:18px; margin:0; font-weight:600; letter-spacing:.3px; }
+  nav { display:flex; gap:4px; margin-left:18px; }
+  nav a { color:var(--muted); text-decoration:none; font-size:13px; padding:6px 12px; border-radius:6px; }
+  nav a.active { color:var(--txt); background:var(--panel2); }
   header .spacer { flex:1; }
   #badge { font-size:13px; color:var(--muted); display:flex; align-items:center; gap:10px; }
   #badge button { background:none; border:1px solid var(--line); color:var(--muted);
@@ -66,7 +69,8 @@
 <body>
 <header>
   <img src="light-40aclogo.png" alt="40ac" onerror="this.style.display='none'">
-  <h1>Admin · User Management</h1>
+  <h1>Admin</h1>
+  <nav><a href="index.html" class="active">Users</a><a href="health.html">Health</a></nav>
   <span class="spacer"></span>
   <div id="badge"></div>
 </header>

@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>FAE Admin — Platform Health</title>
+<link rel="icon" href="data:,">
+<style>
+  :root { --bg:#16191d; --panel:#1f242b; --panel2:#262d36; --line:#323b46;
+          --txt:#e7ebf0; --muted:#8b97a6; --gold:#e0a64a; --red:#d9544e;
+          --green:#3fae6b; --blue:#4a90d9; --amber:#e0a64a; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--txt);
+         font-family:"Segoe UI",Roboto,Helvetica,Arial,sans-serif; overflow-x:hidden; }
+  header { display:flex; align-items:center; gap:14px; padding:14px 20px;
+           background:var(--panel); border-bottom:1px solid var(--line); }
+  header img { height:34px; }
+  header h1 { font-size:18px; margin:0; font-weight:600; }
+  nav { display:flex; gap:4px; margin-left:18px; }
+  nav a { color:var(--muted); text-decoration:none; font-size:13px; padding:6px 12px;
+          border-radius:6px; }
+  nav a.active { color:var(--txt); background:var(--panel2); }
+  header .spacer { flex:1; }
+  #badge { font-size:13px; color:var(--muted); display:flex; align-items:center; gap:10px; }
+  #badge button { background:none; border:1px solid var(--line); color:var(--muted);
+                  border-radius:6px; padding:4px 10px; cursor:pointer; font-size:12px; }
+  main { padding:20px; max-width:1100px; margin:0 auto; }
+  .gate { text-align:center; padding:80px 20px; color:var(--muted); }
+  .gate h2 { color:var(--txt); }
+  .topline { display:flex; align-items:center; gap:14px; margin-bottom:16px; color:var(--muted); font-size:12px; }
+  .topline button { background:none; border:1px solid var(--line); color:var(--muted);
+                    border-radius:6px; padding:5px 12px; cursor:pointer; font-size:12px; }
+  .card { background:var(--panel); border:1px solid var(--line); border-radius:10px;
+          padding:16px 18px; margin-bottom:18px; }
+  .card h3 { margin:0 0 14px; font-size:13px; text-transform:uppercase;
+             letter-spacing:.6px; color:var(--muted); }
+  .dot { display:inline-block; width:9px; height:9px; border-radius:50%; margin-right:7px; vertical-align:middle; }
+  .green{background:var(--green)} .red{background:var(--red)} .blue{background:var(--blue)}
+  .amber{background:var(--amber)} .dim{background:#56606d}
+  .kpis { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:12px; }
+  .kpi { background:var(--panel2); border:1px solid var(--line); border-radius:8px; padding:12px 14px; }
+  .kpi .lbl { font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:.4px; }
+  .kpi .val { font-size:20px; font-weight:600; margin-top:5px; }
+  .kpi .sub { font-size:11px; color:var(--muted); margin-top:3px; }
+  table { width:100%; border-collapse:collapse; font-size:13px; }
+  th { text-align:left; color:var(--muted); font-weight:600; font-size:11px; text-transform:uppercase;
+       letter-spacing:.5px; padding:8px 10px; border-bottom:1px solid var(--line); }
+  td { padding:7px 10px; border-bottom:1px solid var(--panel2); }
+  tr.bad td { background:rgba(217,84,78,.08); }
+  tr.dimrow td { opacity:.5; }
+  .badge { display:inline-block; padding:2px 9px; border-radius:20px; font-size:11px; font-weight:600; }
+  .b-green{background:rgba(63,174,107,.18);color:var(--green)}
+  .b-red{background:rgba(217,84,78,.18);color:var(--red)}
+  .b-blue{background:rgba(74,144,217,.18);color:var(--blue)}
+  .b-amber{background:rgba(224,166,74,.18);color:var(--amber)}
+  .b-dim{background:rgba(139,151,166,.15);color:var(--muted)}
+  .tablewrap { overflow-x:auto; }
+  .sub2 { color:var(--muted); font-size:11px; }
+  .filters { display:flex; gap:14px; margin-bottom:10px; font-size:12px; color:var(--muted); align-items:center; }
+  .filters label { cursor:pointer; }
+  @media (max-width:760px){ nav{margin-left:0} header h1{font-size:15px} }
+</style>
+</head>
+<body>
+<header>
+  <img src="light-40aclogo.png" alt="40ac" onerror="this.style.display='none'">
+  <h1>Admin</h1>
+  <nav><a href="index.html">Users</a><a href="health.html" class="active">Health</a></nav>
+  <span class="spacer"></span>
+  <div id="badge"></div>
+</header>
+
+<main>
+  <div id="gate" class="gate">Checking access…</div>
+  <div id="app" style="display:none">
+    <div class="topline">
+      <span id="ts">—</span>
+      <button id="refresh">↻ Refresh</button>
+      <label style="font-size:12px"><input type="checkbox" id="auto" checked> auto (30s)</label>
+    </div>
+
+    <div class="card">
+      <h3>API · Cloudflare tunnel</h3>
+      <div class="kpis" id="api-kpis"></div>
+    </div>
+
+    <div class="card">
+      <h3>Databases</h3>
+      <div class="tablewrap"><table>
+        <thead><tr><th>Database</th><th>Status</th><th>Latency</th><th>Metric</th><th>Detail</th></tr></thead>
+        <tbody id="db-rows"></tbody>
+      </table></div>
+    </div>
+
+    <div class="card">
+      <h3>Scheduled tasks — svrxspoc (<span id="task-count">0</span>)</h3>
+      <div class="filters">
+        <span id="task-summary"></span>
+        <label><input type="checkbox" id="only-issues"> only issues</label>
+      </div>
+      <div class="tablewrap"><table>
+        <thead><tr><th>Task</th><th>State</th><th>Last run</th><th>Result</th><th>Next run</th></tr></thead>
+        <tbody id="task-rows"></tbody>
+      </table></div>
+    </div>
+  </div>
+</main>
+
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+<script>
+const API = 'https://api.40ac.us';
+window.faeApiBase = API;
+const GOOGLE_CLIENT_ID = '629380732564-eh0uasomqjdo3up8o2po685g9ep544iq.apps.googleusercontent.com';
+const SESSION_KEY = 'fae_user';
+
+(function () {
+  try {
+    var m = document.cookie.match(/(?:^|;\s*)fae40_sso=([^;]+)/);
+    if (m && !localStorage.getItem(SESSION_KEY))
+      localStorage.setItem(SESSION_KEY, decodeURIComponent(m[1]));
+  } catch (e) {}
+  try {
+    var _set = localStorage.setItem.bind(localStorage), _rem = localStorage.removeItem.bind(localStorage);
+    localStorage.setItem = function (k, v) { _set(k, v);
+      if (k === SESSION_KEY) { try { document.cookie = 'fae40_sso=' + encodeURIComponent(v) +
+        ';domain=.40ac.us;path=/;max-age=2592000;Secure;SameSite=Lax'; } catch (e) {} } };
+    localStorage.removeItem = function (k) { _rem(k);
+      if (k === SESSION_KEY) { try { document.cookie =
+        'fae40_sso=;domain=.40ac.us;path=/;max-age=0;Secure;SameSite=Lax'; } catch (e) {} } };
+  } catch (e) {}
+})();
+
+function session() { try { return JSON.parse(localStorage.getItem(SESSION_KEY) || 'null'); } catch (e) { return null; } }
+function signOut() { localStorage.removeItem(SESSION_KEY); location.reload(); }
+function esc(s){ return (s==null?'':String(s)).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];}); }
+function showGate(html){ var g=document.getElementById('gate'); g.style.display='block'; g.innerHTML=html; }
+
+function handleCredential(resp) {
+  try {
+    var p = JSON.parse(atob(resp.credential.split('.')[1].replace(/-/g,'+').replace(/_/g,'/')));
+    localStorage.setItem(SESSION_KEY, JSON.stringify({ credential: resp.credential, email: p.email,
+      displayName: p.name || p.email, picture: p.picture, expires: Date.now()+30*86400*1000 }));
+    location.reload();
+  } catch (e) { showGate('<h2>Sign-in failed</h2>'); }
+}
+function renderSignIn() {
+  showGate('<h2>FAE Admin</h2><p>Admin-only. Sign in with your FAE Google account.</p>' +
+           '<div id="gbtn" style="display:flex;justify-content:center;margin-top:18px"></div>');
+  (function draw(){ if(!(window.google&&google.accounts&&google.accounts.id)) return setTimeout(draw,200);
+    google.accounts.id.initialize({client_id:GOOGLE_CLIENT_ID, callback:handleCredential});
+    google.accounts.id.renderButton(document.getElementById('gbtn'),{theme:'filled_black',size:'large'}); })();
+}
+
+function fmtUptime(s){ if(s==null) return '—'; var d=Math.floor(s/86400),h=Math.floor(s%86400/3600),m=Math.floor(s%3600/60);
+  return (d?d+'d ':'')+(h?h+'h ':'')+m+'m'; }
+function dot(c){ return '<span class="dot '+c+'"></span>'; }
+
+function taskResult(code, state){
+  if (state==='Disabled') return {t:'Disabled', c:'b-dim', bad:false, dim:true};
+  if (code===267009) return {t:'Running', c:'b-blue', bad:false};
+  if (code===0) return {t:'OK', c:'b-green', bad:false};
+  if (code===267011) return {t:'Never run', c:'b-dim', bad:false, dim:true};
+  if (code===267014) return {t:'Stopped', c:'b-amber', bad:false};
+  return {t:'FAILED ('+code+')', c:'b-red', bad:true};
+}
+
+let LAST = null;
+function render(d){
+  LAST = d;
+  document.getElementById('ts').textContent = 'as of ' + d.generated_at + ' (server)';
+
+  // API / tunnel
+  var a = d.api||{}, t = d.tunnel||{};
+  var twHigh = (t.time_wait||0) > 200;
+  document.getElementById('api-kpis').innerHTML = [
+    ['API', dot(a.up?'green':'red') + (a.up?'Up':'Down'), 'uptime ' + fmtUptime(a.uptime_sec)],
+    ['Database', dot(a.db_connected?'green':'red') + (a.db_connected?'Connected':'Error'), esc(a.db_error||'')],
+    ['Cloudflared', dot(t.cloudflared_running?'green':'red') + (t.cloudflared_running?'Running':'Down'),
+       t.cloudflared_start?('since '+esc(t.cloudflared_start)):''],
+    ['Port 8080', dot((t.listen_8080||0)>=1?'green':'red') + ((t.listen_8080||0)+' listener'), ''],
+    ['Established', (t.established!=null?t.established:'—'), 'live conns'],
+    ['TIME_WAIT', dot(twHigh?'amber':'green') + (t.time_wait!=null?t.time_wait:'—'), twHigh?'elevated':'normal'],
+  ].map(function(k){ return '<div class="kpi"><div class="lbl">'+k[0]+'</div><div class="val">'+k[1]+
+      '</div><div class="sub">'+k[2]+'</div></div>'; }).join('');
+
+  // databases
+  document.getElementById('db-rows').innerHTML = (d.databases||[]).map(function(db){
+    var m = db.metric!=null ? (esc(db.metric_label||'')+': '+esc(db.metric)) : '';
+    var slow = db.ms!=null && db.ms>1000;
+    return '<tr'+(db.ok?'':' class="bad"')+'><td>'+esc(db.label)+'</td>'+
+      '<td>'+dot(db.ok?'green':'red')+(db.ok?'OK':'FAIL')+'</td>'+
+      '<td'+(slow?' style="color:var(--amber)"':'')+'>'+(db.ms!=null?db.ms+' ms':'—')+'</td>'+
+      '<td>'+m+'</td><td class="sub2">'+esc(db.error||'')+'</td></tr>';
+  }).join('');
+
+  // tasks
+  var tasks = (d.tasks||[]).slice();
+  var meta = tasks.map(function(x){ return Object.assign({}, x, {_r: taskResult(x.result, x.state)}); });
+  var nBad = meta.filter(function(x){return x._r.bad;}).length;
+  var nRun = meta.filter(function(x){return x.result===267009;}).length;
+  var nDis = meta.filter(function(x){return x.state==='Disabled';}).length;
+  var nOk  = meta.length - nBad - nDis;
+  document.getElementById('task-count').textContent = meta.length;
+  document.getElementById('task-summary').innerHTML =
+    dot('green')+nOk+' ok &nbsp; '+dot('red')+nBad+' failed &nbsp; '+dot('blue')+nRun+' running &nbsp; '+dot('dim')+nDis+' disabled';
+  var onlyIssues = document.getElementById('only-issues').checked;
+  meta.sort(function(x,y){ return (y._r.bad?1:0)-(x._r.bad?1:0) || x.name.localeCompare(y.name); });
+  if (onlyIssues) meta = meta.filter(function(x){ return x._r.bad; });
+  var now = new Date();
+  document.getElementById('task-rows').innerHTML = meta.map(function(x){
+    var overdue = x.next_run && x.state==='Ready' && new Date(x.next_run.replace(' ','T')) < now && !x._r.bad && x.result!==267009;
+    return '<tr'+(x._r.bad?' class="bad"':(x._r.dim?' class="dimrow"':''))+'>'+
+      '<td>'+esc(x.name)+'</td><td class="sub2">'+esc(x.state)+'</td>'+
+      '<td class="sub2">'+esc(x.last_run||'—')+'</td>'+
+      '<td><span class="badge '+x._r.c+'">'+x._r.t+'</span>'+(overdue?' <span class="badge b-amber">overdue</span>':'')+'</td>'+
+      '<td class="sub2">'+esc(x.next_run||'—')+'</td></tr>';
+  }).join('');
+}
+
+async function load(){
+  var btn=document.getElementById('refresh'); btn.disabled=true; btn.textContent='…';
+  try {
+    var r = await window.faeAuth.fetchAuthed(API, API+'/admin/health');
+    if (r.ok) render(await r.json());
+    else document.getElementById('ts').textContent = 'load error '+r.status;
+  } catch(e){ document.getElementById('ts').textContent='load error'; }
+  btn.disabled=false; btn.textContent='↻ Refresh';
+}
+
+let timer=null;
+function setAuto(){ if(timer) clearInterval(timer); if(document.getElementById('auto').checked) timer=setInterval(load,30000); }
+
+async function boot(){
+  var s = session();
+  if (!s) { renderSignIn(); return; }
+  document.getElementById('badge').innerHTML =
+    '<span>'+esc(s.displayName||s.email||'')+'</span><button onclick="signOut()">Sign out</button>';
+  try { await window.faeAuth.ensureSessionToken(API); } catch(e){}
+  var role=null; try { role = await window.faeAuth.ensureUserRole(true); } catch(e){}
+  if (role !== 'admin') { showGate('<h2>Not authorized</h2><p>Admin only'+(role?' — your role is <b>'+esc(role)+'</b>':'')+'.</p>'); return; }
+  document.getElementById('gate').style.display='none';
+  document.getElementById('app').style.display='block';
+  document.getElementById('refresh').addEventListener('click', load);
+  document.getElementById('auto').addEventListener('change', setAuto);
+  document.getElementById('only-issues').addEventListener('change', function(){ if(LAST) render(LAST); });
+  await load(); setAuto();
+}
+window.addEventListener('DOMContentLoaded', boot);
+</script>
+<script src="fae-auth.js?v=12"></script>
+</body>
+</html>
