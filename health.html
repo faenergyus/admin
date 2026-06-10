@@ -58,7 +58,7 @@
   <header class="ahead">
     <button class="burger" id="burger" aria-label="Toggle menu">&#9776;</button>
     <img class="logo" src="light-40aclogo.png" alt="40ac" onerror="this.style.display='none'">
-    <h1>Admin</h1>
+    <span class="fae-appnav" data-current="admin"></span>
     <span class="spacer"></span>
     <div id="badge"></div>
   </header>
@@ -299,5 +299,6 @@ async function boot(){
 window.addEventListener('DOMContentLoaded', boot);
 </script>
 <script src="fae-auth.js?v=12"></script>
+<script src="fae-header.js"></script>
 </body>
 </html>
