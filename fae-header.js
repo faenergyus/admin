@@ -36,7 +36,7 @@
       '.fae-appnav a:hover{color:#c0392b}' +
       '.fae-appnav a.cur{font-weight:800;color:#1a1a1a;cursor:default}' +
       '.fae-appnav a.cur:hover{color:#1a1a1a}' +
-      '.fae-appnav a[data-admin]{display:none}' +     /* hidden until role confirmed */
+      '.fae-appnav a.fae-adm-hidden{display:none}' +   /* hidden until role confirmed */
       '@media (max-width:760px){.fae-appnav{gap:12px;margin-left:10px}}';
     document.head.appendChild(st);
   }
@@ -45,7 +45,10 @@
     var cur = mount.getAttribute('data-current') || '';
     mount.innerHTML = APPS.map(function (a) {
       var isCur = a.id === cur;
-      return '<a' + (isCur ? ' class="cur"' : '') +
+      var cls = [];
+      if (isCur) cls.push('cur');
+      if (a.adminOnly) cls.push('fae-adm-hidden');   // hidden until role confirmed admin
+      return '<a' + (cls.length ? ' class="' + cls.join(' ') + '"' : '') +
              (a.adminOnly ? ' data-admin="1"' : '') +
              (isCur ? '' : ' href="' + a.url + '"') + '>' + a.label + '</a>';
     }).join('');
@@ -53,7 +56,7 @@
 
   function revealAdmin(show) {
     document.querySelectorAll('.fae-appnav a[data-admin]').forEach(function (a) {
-      a.style.display = show ? '' : 'none';
+      a.classList.toggle('fae-adm-hidden', !show);
     });
   }
 
