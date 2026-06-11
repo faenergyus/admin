@@ -75,6 +75,35 @@
   thead tr.frow input:focus, thead tr.frow select:focus { outline:none; border-color:#888; }
   tr.needs td { background:rgba(192,57,43,.15); }
   tr.needs td.title { color:#a32020; font-weight:700; }
+  /* expand-row drawer: per-task result / why-failed / prompt */
+  tbody tr.task { cursor:pointer; }
+  tbody tr.task:hover td { background:rgba(43,108,176,.05); }
+  tbody tr.task.bad:hover td, tbody tr.task.needs:hover td { background:rgba(192,57,43,.12); }
+  tbody tr.task.waiting:hover td { background:rgba(124,58,237,.12); }
+  .caret { display:inline-block; width:11px; color:var(--muted); font-size:10px; transition:transform .12s; }
+  tr.task.open .caret { transform:rotate(90deg); }
+  .whyhint { margin-left:7px; font-size:11px; font-weight:700; color:#a32020; white-space:nowrap; }
+  tr.detail > td { background:#fbfaf7; border-bottom:1px solid var(--line); padding:0; }
+  .drawer { padding:13px 16px 15px; }
+  .drawer h4 { margin:0 0 5px; font-size:11px; text-transform:uppercase; letter-spacing:.07em; color:var(--muted); }
+  .drawer h4.why { color:#a32020; }
+  .resultbox { white-space:pre-wrap; word-break:break-word; font-size:12.5px; line-height:1.5;
+               background:#fff; border:1px solid var(--line); border-radius:7px; padding:9px 11px; color:var(--txt); }
+  .resultbox.fail { border-color:rgba(192,57,43,.45); background:rgba(192,57,43,.05); }
+  .resultbox.empty { color:var(--muted); font-style:italic; }
+  .kids { margin:11px 0 0; padding:0; list-style:none; font-size:12px; }
+  .kids li { padding:3px 0; border-top:1px solid #eee; }
+  .kids li:first-child { border-top:0; }
+  .kids .open { font-weight:700; color:#5b21b6; }
+  .kids a, .kids .kid { text-decoration:none; }
+  .drawer details { margin-top:11px; }
+  .drawer details summary { cursor:pointer; font-size:11px; text-transform:uppercase; letter-spacing:.07em;
+                            color:var(--muted); font-weight:700; outline:none; }
+  .drawer pre.prompt { white-space:pre-wrap; word-break:break-word; font-size:12px; line-height:1.45;
+                       background:#fff; border:1px solid var(--line); border-radius:7px; padding:9px 11px;
+                       margin:7px 0 0; max-height:340px; overflow:auto; color:#333; }
+  .drawer .meta { margin-top:9px; font-size:11px; color:var(--muted); }
+  .drawer .loading { color:var(--muted); font-size:12px; }
 </style>
 </head>
 <body data-page="queue">
@@ -204,6 +233,8 @@ function statusBadge(st){
 }
 
 let LAST=null;
+const expanded = new Set();   // task ids whose detail drawer is open
+const details  = new Map();   // id -> detail payload (cached); 'loading' while in-flight
 function render(d){
   LAST=d;
   document.getElementById('ts').textContent = 'as of ' + d.generated_at + ' (server)';
@@ -255,6 +286,8 @@ function render(d){
     var b=statusBadge(x.status);
     var needs=/needs\s*ryan/i.test(x.title||'') && x.status!=='done';
     var cls = needs ? 'needs' : (b.wait ? 'waiting' : (b.bad ? 'bad' : ''));
+    var open = expanded.has(x.id);
+    var trcls = ('task '+cls+(open?' open':'')).trim();
     // handoff linkage: a child points at its parent; a waiting parent lists its children
     var link='—';
     if (x.parent_id!=null) {
@@ -264,16 +297,67 @@ function render(d){
       var ck=kids[x.id];
       link='<span class="pl">⏳ waiting on '+(ck&&ck.length?ck.map(function(i){return '#'+i;}).join(', '):'child')+'</span>';
     }
-    return '<tr'+(cls?' class="'+cls+'"':'')+'>'+
-      '<td class="id">'+x.id+'</td>'+
+    // failed tasks shout the WHY at a glance — a red cue that the row carries a reason (one click away)
+    var why = b.bad ? '<span class="whyhint" title="click to see why it failed">⚠ why ▾</span>' : '';
+    var main = '<tr class="'+trcls+'" onclick="toggleRow('+x.id+')">'+
+      '<td class="id"><span class="caret">▸</span> '+x.id+'</td>'+
       '<td class="sub2">'+esc(x.target)+'</td>'+
       '<td class="title">'+esc(x.title)+'</td>'+
-      '<td><span class="badge '+b.c+'">'+b.t+'</span></td>'+
+      '<td><span class="badge '+b.c+'">'+b.t+'</span>'+why+'</td>'+
       '<td class="link">'+link+'</td>'+
       '<td class="sub2">'+fmtAge(x.age_sec)+'</td>'+
       '<td class="sub2">'+(x.run_sec!=null?fmtAge(x.run_sec):'—')+'</td>'+
       '<td class="sub2">'+esc((x.created_by||'').replace('service-',''))+'</td></tr>';
+    return main + (open ? ('<tr class="detail"><td colspan="8"><div class="drawer" id="dr-'+x.id+'">'+
+        detailHTML(x.id, x.status)+'</div></td></tr>') : '');
   }).join('');
+}
+
+// ── per-task detail drawer (lazy, admin-gated /admin/queue/{id}) ──────────
+function toggleRow(id){
+  if (expanded.has(id)) { expanded.delete(id); }
+  else { expanded.add(id); if (!details.has(id)) loadDetail(id); }
+  if (LAST) render(LAST);
+}
+async function loadDetail(id){
+  details.set(id, 'loading');
+  try {
+    var r = await window.faeAuth.fetchAuthed(API, API+'/admin/queue/'+id);
+    details.set(id, r.ok ? await r.json() : {error:'load error '+r.status});
+  } catch(e){ details.set(id, {error:'load error'}); }
+  if (expanded.has(id) && LAST) render(LAST);
+}
+function detailHTML(id, status){
+  var d = details.get(id);
+  if (!d || d==='loading') return '<div class="loading">Loading…</div>';
+  if (d.error) return '<div class="loading">'+esc(d.error)+'</div>';
+  var failed = d.status==='failed';
+  var res = (d.result||'').trim();
+  var out = '<h4'+(failed?' class="why"':'')+'>'+(failed?'Why it failed':'Result / close note')+'</h4>';
+  out += res
+    ? '<div class="resultbox'+(failed?' fail':'')+'">'+esc(res)+'</div>'
+    : '<div class="resultbox empty">No result note yet'+
+      (['pending','claimed','running','in_progress','waiting'].indexOf(d.status)>=0?' — task is not finished.':'.')+'</div>';
+  // handoff: children this task dispatched (a waiting task shows what it's blocked on)
+  var ch = d.children||[];
+  if (ch.length){
+    out += '<h4 style="margin-top:13px">Handoff — dispatched '+ch.length+
+      ' child task'+(ch.length>1?'s':'')+(d.open_children?' · '+d.open_children+' still open':'')+'</h4>';
+    out += '<ul class="kids">'+ch.map(function(c){
+      var b=statusBadge(c.status); var openk=['done','failed'].indexOf(c.status)<0;
+      return '<li class="'+(openk?'open':'')+'">#'+c.id+' <span class="sub2">['+esc(c.target)+']</span> '+
+             '<span class="badge '+b.c+'">'+b.t+'</span> '+esc(c.title)+'</li>';
+    }).join('')+'</ul>';
+  }
+  if (d.parent_id!=null){
+    out += '<div class="meta">↳ child of task #'+d.parent_id+
+      (d.child_acked?' · ✓ completion acked the parent':'')+'</div>';
+  }
+  out += '<details><summary>Prompt</summary><pre class="prompt">'+esc(d.prompt||'(none)')+'</pre></details>';
+  out += '<div class="meta">created '+esc((d.created_at||'').replace('T',' ').slice(0,19))+
+    ' · by '+esc((d.created_by||'').replace('service-',''))+
+    (d.finished_at?(' · finished '+esc(d.finished_at.replace('T',' ').slice(0,19))):'')+'</div>';
+  return out;
 }
 
 let pageOffset=0;
