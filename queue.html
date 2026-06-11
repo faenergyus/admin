@@ -64,9 +64,9 @@
   #range { font-size:12px; color:var(--muted); }
   /* Excel-AutoFilter-style per-column filter row (matches gas analysis) */
   thead tr.frow th { padding:4px 6px; background:#f2f3f5; border-bottom:2px solid var(--line); }
-  thead tr.frow input { width:100%; box-sizing:border-box; font-size:11px; padding:4px 6px;
-                        border:1px solid var(--line); border-radius:4px; background:#fff; color:var(--txt); }
-  thead tr.frow input:focus { outline:none; border-color:#888; }
+  thead tr.frow input, thead tr.frow select { width:100%; box-sizing:border-box; font-size:11px;
+                        padding:4px 6px; border:1px solid var(--line); border-radius:4px; background:#fff; color:var(--txt); }
+  thead tr.frow input:focus, thead tr.frow select:focus { outline:none; border-color:#888; }
   tr.needs td { background:rgba(192,57,43,.15); }
   tr.needs td.title { color:#a32020; font-weight:700; }
 </style>
@@ -121,7 +121,7 @@
                 <th><input id="f-id" placeholder="&ge;N, lo-hi" autocomplete="off" title="e.g. >=350, <=300, 300-360"></th>
                 <th><input id="f-target" placeholder="filter…" autocomplete="off"></th>
                 <th><input id="f-q" placeholder="search words…" autocomplete="off"></th>
-                <th><input id="f-status" placeholder="filter…" autocomplete="off"></th>
+                <th><select id="f-status"><option value="">(all)</option></select></th>
                 <th><input id="f-age" placeholder="&ge;1d, &le;2h" autocomplete="off" title="units m/h/d, e.g. >=1d, <=2h, 1h-1d"></th>
                 <th></th>
                 <th><input id="f-by" placeholder="filter…" autocomplete="off"></th>
@@ -200,6 +200,14 @@ function render(d){
   LAST=d;
   document.getElementById('ts').textContent = 'as of ' + d.generated_at + ' (server)';
   var bs = d.by_status||{};
+  // populate the Status filter dropdown from the queue's actual statuses (once)
+  var fst=document.getElementById('f-status');
+  if (fst && fst.tagName==='SELECT' && fst.dataset.built!=='1') {
+    var cur=fst.value;
+    fst.innerHTML='<option value="">(all)</option>'+Object.keys(bs).sort().map(function(s){
+      return '<option value="'+esc(s)+'">'+esc(s)+'</option>'; }).join('');
+    fst.value=cur; fst.dataset.built='1';
+  }
   var oldAmber = (d.oldest_pending_sec||0) > 1800;
   document.getElementById('kpis').innerHTML = [
     ['Pending', dot((bs.pending||0)>0?'amber':'dim') + (bs.pending||0), 'waiting to claim'],
@@ -279,7 +287,7 @@ async function boot(){
   var _fd=null;
   function onFilter(){ if(_fd) clearTimeout(_fd); _fd=setTimeout(function(){ pageOffset=0; load(); }, 300); }
   ['f-q','f-target','f-status','f-by','f-id','f-age'].forEach(function(id){
-    var el=document.getElementById(id); if(el) el.addEventListener('input', onFilter);
+    var el=document.getElementById(id); if(el){ el.addEventListener('input', onFilter); el.addEventListener('change', onFilter); }
   });
   document.getElementById('resetf').addEventListener('click', function(){
     ['f-q','f-target','f-status','f-by','f-id','f-age'].forEach(function(id){ var el=document.getElementById(id); if(el) el.value=''; });
