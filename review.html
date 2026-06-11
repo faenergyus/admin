@@ -48,6 +48,22 @@
   .empty .big { font-size:40px; margin-bottom:8px; }
   .msg { font-size:12px; margin-left:6px; }
   .msg.ok { color:#256b39; } .msg.err { color:var(--red); }
+  /* waiting items (a sender blocked on a child) get a purple accent */
+  .item.waiting { border-top-color:#7c3aed; }
+  .tag { display:inline-block; padding:2px 9px; border-radius:20px; font-size:11px; font-weight:700;
+         text-transform:uppercase; letter-spacing:.4px; }
+  .tag.wait { background:rgba(124,58,237,.14); color:#5b21b6; }
+  .tag.note { background:rgba(183,121,31,.16); color:#8a5a12; }
+  .link { font-size:11.5px; color:var(--muted); margin:2px 0 6px; }
+  .link b { color:#5b21b6; }
+  .kids { font-size:11.5px; color:var(--muted); margin:2px 0 8px; display:flex; flex-wrap:wrap; gap:6px; }
+  .kid { background:var(--panel2); border:1px solid var(--line); border-radius:14px; padding:2px 9px; }
+  .kid.open { color:#1d4e80; border-color:#bcd4ee; } .kid.closed { color:var(--muted); }
+  .respond { display:flex; gap:8px; align-items:center; flex-wrap:wrap; width:100%;
+             margin-top:10px; padding-top:10px; border-top:1px dashed var(--line); }
+  .respond textarea { flex:1 1 320px; min-height:38px; max-width:100%; border:1px solid var(--line);
+             border-radius:7px; padding:7px 10px; font-size:12.5px; font-family:inherit; resize:vertical; }
+  .btn.respond-btn { background:#f1ecfb; border-color:#cdbdf0; color:#5b21b6; }
   @media (max-width:760px){ .rq { margin-left:0; width:100%; } .rq input{ flex:1 1 auto; width:auto; } }
 </style>
 </head>
@@ -75,9 +91,12 @@
           <button id="refresh">↻ Refresh</button>
           <label style="font-size:12px"><input type="checkbox" id="auto"> auto (30s)</label>
         </div>
-        <p class="intro">Items the agents flagged as needing you — a judgment call or an
-          <code>--apply</code> gate. <b>Approve</b> closes the item as resolved.
-          <b>Re-queue</b> sends it back to a worker lane as a new task and closes this one.</p>
+        <p class="intro">Items needing you — a NEEDS-RYAN judgment call / <code>--apply</code> gate,
+          or a <b>waiting</b> agent blocked on a dispatched child. <b>Respond</b> sends your
+          feedback back to the blocked agent and re-wakes it (sets it pending with your answer
+          appended) — use this to close the loop instead of spawning a detached task.
+          <b>Approve</b> closes the item as resolved. <b>Re-queue</b> sends it to a worker lane
+          as a new task and closes this one.</p>
         <div id="list"></div>
       </div>
     </main>
@@ -91,7 +110,7 @@ const API = 'https://api.40ac.us';
 window.faeApiBase = API;
 const GOOGLE_CLIENT_ID = '629380732564-eh0uasomqjdo3up8o2po685g9ep544iq.apps.googleusercontent.com';
 const SESSION_KEY = 'fae_user';
-const LANES = ['analyst','scada','forms','trend','db','land','map','wbd','admin'];
+const LANES = ['analyst','scada','forms','trend','db','land','map','wbd','admin','regulatory'];
 
 (function () {
   try {
@@ -161,12 +180,35 @@ function render(d){
   list.innerHTML = items.map(function(x){
     var link = liveLink(x.prompt);
     var opts = LANES.map(function(l){ return '<option value="'+l+'">'+l+'</option>'; }).join('');
-    return '<div class="item" data-id="'+x.id+'">'+
+    var waiting = x.kind === 'waiting';
+    var tag = waiting
+      ? '<span class="tag wait">⏳ waiting</span>'
+      : '<span class="tag note">needs ryan</span>';
+    // handoff linkage
+    var linkage = '';
+    if (waiting) {
+      var ch = x.children || [];
+      if (ch.length) {
+        linkage = '<div class="kids"><span>waiting on '+(x.open_children||0)+' open of '+ch.length+':</span>'+
+          ch.map(function(c){
+            var open = (c.status!=='done' && c.status!=='failed');
+            return '<span class="kid '+(open?'open':'closed')+'">#'+c.id+' '+esc(c.target)+
+                   ' · '+esc(c.status)+'</span>';
+          }).join('')+'</div>';
+      } else {
+        linkage = '<div class="link">waiting on a child (none currently in queue)</div>';
+      }
+    } else if (x.parent_id!=null) {
+      linkage = '<div class="link">↳ blocking waiting task <b>#'+x.parent_id+'</b> — Respond re-wakes it</div>';
+    }
+    return '<div class="item'+(waiting?' waiting':'')+'" data-id="'+x.id+'"'+
+        (x.parent_id!=null?' data-parent="'+x.parent_id+'"':'')+'>'+
       '<div class="head">'+
-        '<span class="tid">#'+x.id+'</span>'+
+        '<span class="tid">#'+x.id+'</span>'+ tag +
         '<span class="ttl">'+esc(x.title||'(untitled)')+'</span>'+
         '<span class="meta">age '+fmtAge(x.age_sec)+' · pri '+esc(x.priority)+' · by '+esc((x.created_by||'').replace('service-',''))+'</span>'+
       '</div>'+
+      linkage +
       '<div class="prompt">'+esc(x.prompt||'(no prompt)')+'</div>'+
       '<div class="actions">'+
         (link ? '<a class="btn open" href="'+esc(link)+'" target="_blank" rel="noopener">Open live ↗</a>' : '')+
@@ -177,6 +219,12 @@ function render(d){
           '<button class="btn requeue" data-act="requeue">↻ Re-queue</button>'+
         '</span>'+
         '<span class="msg"></span>'+
+      '</div>'+
+      '<div class="respond">'+
+        '<textarea class="resp-fb" placeholder="'+(waiting
+            ? 'Your answer to the blocked agent — re-wakes #'+x.id+' as pending'
+            : 'Your answer — re-wakes the blocked agent'+(x.parent_id!=null?' (#'+x.parent_id+')':''))+'"></textarea>'+
+        '<button class="btn respond-btn" data-act="respond">➤ Respond &amp; re-wake</button>'+
       '</div>'+
     '</div>';
   }).join('');
@@ -202,6 +250,13 @@ async function act(item, kind){
     var url, opts={method:'POST'};
     if (kind==='approve') {
       url = API+'/admin/review/items/'+id+'/resolve';
+    } else if (kind==='respond') {
+      var fb = (item.querySelector('.resp-fb').value || '').trim();
+      if (!fb) { msg.className='msg err'; msg.textContent='enter feedback first';
+        btns.forEach(function(b){ b.disabled=false; }); return; }
+      url = API+'/admin/review/items/'+id+'/respond';
+      opts.headers = {'Content-Type':'application/json'};
+      opts.body = JSON.stringify({feedback:fb});
     } else {
       var target = item.querySelector('.rq-target').value;
       var note = item.querySelector('.rq-note').value || '';
@@ -213,7 +268,9 @@ async function act(item, kind){
     if (r.ok) {
       var j = await r.json();
       msg.className='msg ok';
-      msg.textContent = kind==='approve' ? 'resolved ✓' : ('re-queued to '+j.requeued_to+' as #'+j.new_id+' ✓');
+      msg.textContent = kind==='approve' ? 'resolved ✓'
+        : kind==='respond' ? ('re-woke #'+j.woke_id+' (pending) ✓')
+        : ('re-queued to '+j.requeued_to+' as #'+j.new_id+' ✓');
       var card = item;
       setTimeout(function(){ card.style.transition='opacity .3s'; card.style.opacity='.35'; setTimeout(load, 350); }, 600);
     } else {
