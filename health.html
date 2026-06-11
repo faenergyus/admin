@@ -32,11 +32,11 @@
   .dot { display:inline-block; width:9px; height:9px; border-radius:50%; margin-right:7px; vertical-align:middle; }
   .green{background:var(--green)} .red{background:var(--red)} .blue{background:var(--blue)}
   .amber{background:var(--amber)} .dim{background:#9aa0a6}
-  .kpis { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:12px; }
-  .kpi { background:var(--panel2); border:1px solid var(--line); border-radius:8px; padding:12px 14px; }
-  .kpi .lbl { font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:.4px; }
-  .kpi .val { font-size:20px; font-weight:700; margin-top:5px; }
-  .kpi .sub { font-size:11px; color:var(--muted); margin-top:3px; }
+  .kpis { display:grid; grid-template-columns:repeat(auto-fit,minmax(110px,1fr)); gap:7px; }
+  .kpi { background:var(--panel2); border:1px solid var(--line); border-radius:6px; padding:5px 9px; }
+  .kpi .lbl { font-size:9px; color:var(--muted); text-transform:uppercase; letter-spacing:.3px; }
+  .kpi .val { font-size:13px; font-weight:700; margin-top:1px; }
+  .kpi .sub { font-size:9px; color:var(--muted); margin-top:0; }
   table { width:100%; border-collapse:collapse; font-size:13px; }
   th { text-align:left; color:var(--muted); font-weight:700; font-size:11px; text-transform:uppercase;
        letter-spacing:.5px; padding:8px 10px; border-bottom:2px solid var(--line); }
@@ -87,6 +87,15 @@
     </div>
 
     <div class="card">
+      <h3>SCADA Status — scanning tasks (<span id="scada-count">0</span>)</h3>
+      <div class="filters"><span id="scada-summary"></span></div>
+      <div class="tablewrap"><table>
+        <thead><tr><th>Task</th><th>State</th><th>Last run</th><th>Result</th><th>Next run</th></tr></thead>
+        <tbody id="scada-rows"></tbody>
+      </table></div>
+    </div>
+
+    <div class="card">
       <h3>Databases</h3>
       <div class="tablewrap"><table>
         <thead><tr><th>Database</th><th>Status</th><th>Latency</th><th>Metric</th><th>Detail</th></tr></thead>
@@ -105,7 +114,7 @@
     </div>
 
     <div class="card">
-      <h3>Scheduled tasks — svrxspoc (<span id="task-count">0</span>)</h3>
+      <h3>Other scheduled tasks — svrxspoc (<span id="task-count">0</span>)</h3>
       <div class="filters">
         <span id="task-summary"></span>
         <label><input type="checkbox" id="only-issues"> only issues</label>
@@ -248,28 +257,44 @@ function render(d){
   }
 
   // tasks — drop one-shot/finished tasks (no next run), but keep anything
-  // currently running (the always-on services have no "next run" by nature).
-  var tasks = (d.tasks||[]).filter(function(x){ return x.next_run || x.result===267009; });
-  var meta = tasks.map(function(x){ return Object.assign({}, x, {_r: taskResult(x.result, x.state)}); });
-  var nBad = meta.filter(function(x){return x._r.bad;}).length;
-  var nRun = meta.filter(function(x){return x.result===267009;}).length;
-  var nDis = meta.filter(function(x){return x.state==='Disabled';}).length;
-  var nOk  = meta.length - nBad - nDis;
-  document.getElementById('task-count').textContent = meta.length;
-  document.getElementById('task-summary').innerHTML =
-    dot('green')+nOk+' ok &nbsp; '+dot('red')+nBad+' failed &nbsp; '+dot('blue')+nRun+' running &nbsp; '+dot('dim')+nDis+' disabled';
-  var onlyIssues = document.getElementById('only-issues').checked;
-  meta.sort(function(x,y){ return (y._r.bad?1:0)-(x._r.bad?1:0) || x.name.localeCompare(y.name); });
-  if (onlyIssues) meta = meta.filter(function(x){ return x._r.bad; });
-  var now = new Date();
-  document.getElementById('task-rows').innerHTML = meta.map(function(x){
-    var overdue = x.next_run && x.state==='Ready' && new Date(x.next_run.replace(' ','T')) < now && !x._r.bad && x.result!==267009;
-    return '<tr'+(x._r.bad?' class="bad"':(x._r.dim?' class="dimrow"':''))+'>'+
-      '<td>'+esc(x.name)+'</td><td class="sub2">'+esc(x.state)+'</td>'+
-      '<td class="sub2">'+esc(x.last_run||'—')+'</td>'+
-      '<td><span class="badge '+x._r.c+'">'+x._r.t+'</span>'+(overdue?' <span class="badge b-amber">overdue</span>':'')+'</td>'+
-      '<td class="sub2">'+esc(x.next_run||'—')+'</td></tr>';
-  }).join('');
+  // currently running. Split the SCADA scanning tasks into their own section.
+  var allTasks = (d.tasks||[]).filter(function(x){ return x.next_run || x.result===267009; })
+    .map(function(x){ return Object.assign({}, x, {_r: taskResult(x.result, x.state)}); });
+  var SCAN_RE = /scada|scan/i;
+  var scanTasks  = allTasks.filter(function(x){ return SCAN_RE.test(x.name); });
+  var otherTasks = allTasks.filter(function(x){ return !SCAN_RE.test(x.name); });
+
+  function taskSummary(list){
+    var b=list.filter(function(x){return x._r.bad;}).length;
+    var r=list.filter(function(x){return x.result===267009;}).length;
+    var dz=list.filter(function(x){return x.state==='Disabled';}).length;
+    return dot('green')+(list.length-b-dz)+' ok &nbsp; '+dot('red')+b+' failed &nbsp; '+
+           dot('blue')+r+' running &nbsp; '+dot('dim')+dz+' disabled';
+  }
+  function taskRowsHtml(list){
+    var now=new Date();
+    return list.slice().sort(function(x,y){ return (y._r.bad?1:0)-(x._r.bad?1:0) || x.name.localeCompare(y.name); })
+      .map(function(x){
+        var overdue = x.next_run && x.state==='Ready' && new Date(x.next_run.replace(' ','T')) < now && !x._r.bad && x.result!==267009;
+        return '<tr'+(x._r.bad?' class="bad"':(x._r.dim?' class="dimrow"':''))+'>'+
+          '<td>'+esc(x.name)+'</td><td class="sub2">'+esc(x.state)+'</td>'+
+          '<td class="sub2">'+esc(x.last_run||'—')+'</td>'+
+          '<td><span class="badge '+x._r.c+'">'+x._r.t+'</span>'+(overdue?' <span class="badge b-amber">overdue</span>':'')+'</td>'+
+          '<td class="sub2">'+esc(x.next_run||'—')+'</td></tr>';
+      }).join('');
+  }
+
+  // SCADA Status (scanning tasks)
+  document.getElementById('scada-count').textContent = scanTasks.length;
+  document.getElementById('scada-summary').innerHTML = taskSummary(scanTasks);
+  document.getElementById('scada-rows').innerHTML = taskRowsHtml(scanTasks);
+
+  // Other scheduled tasks (everything else)
+  var shown = document.getElementById('only-issues').checked
+    ? otherTasks.filter(function(x){ return x._r.bad; }) : otherTasks;
+  document.getElementById('task-count').textContent = otherTasks.length;
+  document.getElementById('task-summary').innerHTML = taskSummary(otherTasks);
+  document.getElementById('task-rows').innerHTML = taskRowsHtml(shown);
 }
 
 async function load(){
