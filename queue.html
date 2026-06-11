@@ -118,11 +118,12 @@
             <thead>
               <tr><th>#</th><th>Lane</th><th>Title</th><th>Status</th><th>Age</th><th>Run</th><th>By</th></tr>
               <tr class="frow">
-                <th></th>
+                <th><input id="f-id" placeholder="&ge;N, lo-hi" autocomplete="off" title="e.g. >=350, <=300, 300-360"></th>
                 <th><input id="f-target" placeholder="filter…" autocomplete="off"></th>
                 <th><input id="f-q" placeholder="search words…" autocomplete="off"></th>
                 <th><input id="f-status" placeholder="filter…" autocomplete="off"></th>
-                <th></th><th></th>
+                <th><input id="f-age" placeholder="&ge;1d, &le;2h" autocomplete="off" title="units m/h/d, e.g. >=1d, <=2h, 1h-1d"></th>
+                <th></th>
                 <th><input id="f-by" placeholder="filter…" autocomplete="off"></th>
               </tr>
             </thead>
@@ -245,7 +246,7 @@ function render(d){
 let pageOffset=0;
 function filterQS(){
   var p='offset='+pageOffset+'&limit=50';
-  [['q','f-q'],['target','f-target'],['status','f-status'],['by','f-by']].forEach(function(pair){
+  [['q','f-q'],['target','f-target'],['status','f-status'],['by','f-by'],['id','f-id'],['age','f-age']].forEach(function(pair){
     var el=document.getElementById(pair[1]); var v=el?el.value.trim():'';
     if (v) p+='&'+pair[0]+'='+encodeURIComponent(v);
   });
@@ -277,11 +278,11 @@ async function boot(){
   document.getElementById('auto').addEventListener('change', setAuto);
   var _fd=null;
   function onFilter(){ if(_fd) clearTimeout(_fd); _fd=setTimeout(function(){ pageOffset=0; load(); }, 300); }
-  ['f-q','f-target','f-status','f-by'].forEach(function(id){
+  ['f-q','f-target','f-status','f-by','f-id','f-age'].forEach(function(id){
     var el=document.getElementById(id); if(el) el.addEventListener('input', onFilter);
   });
   document.getElementById('resetf').addEventListener('click', function(){
-    ['f-q','f-target','f-status','f-by'].forEach(function(id){ var el=document.getElementById(id); if(el) el.value=''; });
+    ['f-q','f-target','f-status','f-by','f-id','f-age'].forEach(function(id){ var el=document.getElementById(id); if(el) el.value=''; });
     pageOffset=0; load();
   });
   document.getElementById('prev').addEventListener('click', function(){ pageOffset=Math.max(0,pageOffset-50); load(); });
