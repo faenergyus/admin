@@ -30,7 +30,7 @@
              font-weight:700; color:#9aa0a6; }
   .dot { display:inline-block; width:9px; height:9px; border-radius:50%; margin-right:7px; vertical-align:middle; }
   .green{background:var(--green)} .red{background:var(--red)} .blue{background:var(--blue)}
-  .amber{background:var(--amber)} .dim{background:#9aa0a6}
+  .amber{background:var(--amber)} .dim{background:#9aa0a6} .purple{background:#7c3aed}
   .kpis { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:12px; }
   .kpi { background:var(--panel2); border:1px solid var(--line); border-radius:8px; padding:12px 14px; }
   .kpi .lbl { font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:.4px; }
@@ -53,7 +53,13 @@
   .b-amber{background:rgba(183,121,31,.16);color:#8a5a12}
   .b-blue{background:rgba(43,108,176,.14);color:#1d4e80}
   .b-red{background:rgba(192,57,43,.12);color:#a32020}
+  .b-wait{background:rgba(124,58,237,.14);color:#5b21b6}
   .b-dim{background:rgba(106,138,106,.14);color:var(--muted)}
+  td.link { font-size:11px; color:var(--muted); white-space:nowrap; }
+  td.link .pl { color:#5b21b6; font-weight:600; }
+  td.link .ch { color:#1d4e80; }
+  td.link .ack { color:#2b3036; }
+  tr.waiting td { background:rgba(124,58,237,.07); }
   .tablewrap { overflow-x:auto; }
   .filters { display:flex; gap:14px; margin-bottom:10px; font-size:12px; color:var(--muted); align-items:center; }
   .filters label { cursor:pointer; }
@@ -116,12 +122,13 @@
           </div>
           <div class="tablewrap"><table>
             <thead>
-              <tr><th>#</th><th>Lane</th><th>Title</th><th>Status</th><th>Age</th><th>Run</th><th>By</th></tr>
+              <tr><th>#</th><th>Lane</th><th>Title</th><th>Status</th><th>Handoff</th><th>Age</th><th>Run</th><th>By</th></tr>
               <tr class="frow">
                 <th><input id="f-id" placeholder="&ge;N, lo-hi" autocomplete="off" title="e.g. >=350, <=300, 300-360"></th>
                 <th><input id="f-target" placeholder="filter…" autocomplete="off"></th>
                 <th><input id="f-q" placeholder="search words…" autocomplete="off"></th>
                 <th><select id="f-status"><option value="">(all)</option></select></th>
+                <th></th>
                 <th><input id="f-age" placeholder="&ge;1d, &le;2h" autocomplete="off" title="units m/h/d, e.g. >=1d, <=2h, 1h-1d"></th>
                 <th></th>
                 <th><input id="f-by" placeholder="filter…" autocomplete="off"></th>
@@ -189,7 +196,8 @@ function fmtAge(s){
 }
 function statusBadge(st){
   if (st==='failed') return {t:'failed', c:'b-red', bad:true};
-  if (st==='in_progress' || st==='running') return {t:'in progress', c:'b-blue'};
+  if (st==='waiting') return {t:'waiting', c:'b-wait', wait:true};
+  if (st==='in_progress' || st==='running' || st==='claimed') return {t:'in progress', c:'b-blue'};
   if (st==='pending') return {t:'pending', c:'b-amber'};
   if (st==='done') return {t:'done', c:'b-dim'};
   return {t:esc(st||'?'), c:'b-dim'};
@@ -209,9 +217,11 @@ function render(d){
     fst.value=cur; fst.dataset.built='1';
   }
   var oldAmber = (d.oldest_pending_sec||0) > 1800;
+  var inprog = (bs.in_progress||0)+(bs.running||0)+(bs.claimed||0);
   document.getElementById('kpis').innerHTML = [
     ['Pending', dot((bs.pending||0)>0?'amber':'dim') + (bs.pending||0), 'waiting to claim'],
-    ['In progress', dot((bs.in_progress||0)>0?'blue':'dim') + (bs.in_progress||0), 'being worked'],
+    ['In progress', dot(inprog>0?'blue':'dim') + inprog, 'being worked'],
+    ['Waiting', dot((bs.waiting||0)>0?'purple':'dim') + (bs.waiting||0), 'blocked on a child'],
     ['Failed (24h)', dot((d.failed_24h||0)>0?'red':'dim') + (d.failed_24h||0), 'last 24 hours'],
     ['Oldest pending', '<span'+(oldAmber?' style="color:var(--amber)"':'')+'>'+fmtAge(d.oldest_pending_sec)+'</span>', oldAmber?'aging':'waiting'],
     ['Done', (bs.done||0), 'completed (all-time)'],
@@ -222,12 +232,14 @@ function render(d){
   var lanes = {};
   Object.keys(d.pending_by_target||{}).forEach(function(t){ lanes[t]=lanes[t]||{}; lanes[t].p=d.pending_by_target[t]; });
   Object.keys(d.in_progress_by_target||{}).forEach(function(t){ lanes[t]=lanes[t]||{}; lanes[t].r=d.in_progress_by_target[t]; });
+  Object.keys(d.waiting_by_target||{}).forEach(function(t){ lanes[t]=lanes[t]||{}; lanes[t].w=d.waiting_by_target[t]; });
   var keys = Object.keys(lanes).sort();
   document.getElementById('lanes').innerHTML = keys.length ? keys.map(function(t){
     var l=lanes[t]; var parts=[];
     if (l.p) parts.push(l.p+' pending'); if (l.r) parts.push(l.r+' running');
+    if (l.w) parts.push(l.w+' waiting');
     return '<span class="chip"><b>'+esc(t)+'</b> &nbsp;'+parts.join(' · ')+'</span>';
-  }).join('') : '<span class="chip none">queue is clear — nothing pending or running</span>';
+  }).join('') : '<span class="chip none">queue is clear — nothing pending, running or waiting</span>';
 
   // tasks (server-filtered + paged). NEEDS RYAN tasks render red.
   var rows=(d.recent||[]);
@@ -236,15 +248,28 @@ function render(d){
   document.getElementById('range').textContent = from+'–'+to+' of '+total+(d.filtered?' (filtered)':'');
   document.getElementById('prev').disabled = off<=0;
   document.getElementById('next').disabled = (off+lim) >= total;
+  // map parent id -> child ids present in the current page (for waiting parents)
+  var kids={};
+  rows.forEach(function(x){ if(x.parent_id!=null){ (kids[x.parent_id]=kids[x.parent_id]||[]).push(x.id); } });
   document.getElementById('rows').innerHTML = rows.map(function(x){
     var b=statusBadge(x.status);
     var needs=/needs\s*ryan/i.test(x.title||'') && x.status!=='done';
-    var cls = needs ? 'needs' : (b.bad ? 'bad' : '');
+    var cls = needs ? 'needs' : (b.wait ? 'waiting' : (b.bad ? 'bad' : ''));
+    // handoff linkage: a child points at its parent; a waiting parent lists its children
+    var link='—';
+    if (x.parent_id!=null) {
+      link='<span class="ch">↳ child of #'+x.parent_id+'</span>'+
+           (x.child_acked?' <span class="ack" title="completion has poked the parent">✓acked</span>':'');
+    } else if (x.status==='waiting') {
+      var ck=kids[x.id];
+      link='<span class="pl">⏳ waiting on '+(ck&&ck.length?ck.map(function(i){return '#'+i;}).join(', '):'child')+'</span>';
+    }
     return '<tr'+(cls?' class="'+cls+'"':'')+'>'+
       '<td class="id">'+x.id+'</td>'+
       '<td class="sub2">'+esc(x.target)+'</td>'+
       '<td class="title">'+esc(x.title)+'</td>'+
       '<td><span class="badge '+b.c+'">'+b.t+'</span></td>'+
+      '<td class="link">'+link+'</td>'+
       '<td class="sub2">'+fmtAge(x.age_sec)+'</td>'+
       '<td class="sub2">'+(x.run_sec!=null?fmtAge(x.run_sec):'—')+'</td>'+
       '<td class="sub2">'+esc((x.created_by||'').replace('service-',''))+'</td></tr>';
